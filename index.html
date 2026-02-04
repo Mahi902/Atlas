@@ -614,7 +614,7 @@
     </div>
 
     <script>
-        // Atlas Launcher Core
+        // Atlas Launcher Core - FIXED VERSION
         class AtlasLauncher {
             constructor() {
                 // Database setup
@@ -707,6 +707,15 @@
                     this.renderDesktopApps();
                     this.renderStartupApps();
                     this.updateEmptyState();
+                    
+                    // Check for Settings app - add if not exists
+                    if (!this.apps.some(app => app.name === 'Settings')) {
+                        this.addDefaultApps();
+                    }
+                };
+                
+                request.onerror = (error) => {
+                    console.error('Error loading apps:', error);
                 };
             }
             
@@ -728,8 +737,7 @@
             monitorAppExecute() {
                 if (!this.db) return;
                 
-                // This would typically use IndexedDB events or polling
-                // For this demo, we'll simulate checking for commands
+                // Check for new appexecute commands
                 setInterval(() => {
                     const transaction = this.db.transaction(['appexecute'], 'readonly');
                     const store = transaction.objectStore('appexecute');
@@ -737,37 +745,61 @@
                     
                     request.onsuccess = (event) => {
                         const commands = event.target.result || [];
-                        commands.forEach(command => {
-                            this.executeAppCommand(command);
+                        if (commands.length > 0) {
+                            commands.forEach(command => {
+                                this.executeAppCommand(command);
+                                
+                                // Remove command after execution
+                                const deleteTransaction = this.db.transaction(['appexecute'], 'readwrite');
+                                const deleteStore = deleteTransaction.objectStore('appexecute');
+                                deleteStore.delete(command.id);
+                            });
                             
-                            // Remove command after execution
-                            const deleteTransaction = this.db.transaction(['appexecute'], 'readwrite');
-                            const deleteStore = deleteTransaction.objectStore('appexecute');
-                            deleteStore.delete(command.id);
-                        });
+                            // Reload apps if there were any commands
+                            this.loadApps();
+                        }
                     };
                 }, 1000);
             }
             
             // Execute commands from apps
             executeAppCommand(command) {
-                if (command.script) {
-                    try {
-                        // Execute the script (in a real scenario, this would be more secure)
-                        console.log('Executing app command:', command);
-                        
-                        // Example: Change wallpaper
-                        if (command.script.includes('wallpaper')) {
-                            const urlMatch = command.script.match(/url\(['"]([^'"]+)['"]\)/);
-                            if (urlMatch) {
-                                this.desktop.style.backgroundImage = `linear-gradient(rgba(32, 33, 36, 0.8), rgba(32, 33, 36, 0.9)), url('${urlMatch[1]}')`;
-                                this.showNotification('Wallpaper Changed', 'Gallery app updated your wallpaper', 'info');
-                            }
+                try {
+                    console.log('Executing app command:', command);
+                    
+                    // Handle different command types
+                    if (command.type === 'refresh-apps') {
+                        this.loadApps();
+                        this.showNotification('Apps Refreshed', 'Application list has been updated', 'info');
+                    } else if (command.type === 'wallpaper') {
+                        if (command.data && command.data.url) {
+                            this.desktop.style.backgroundImage = `linear-gradient(rgba(32, 33, 36, 0.8), rgba(32, 33, 36, 0.9)), url('${command.data.url}')`;
+                            this.showNotification('Wallpaper Changed', 'Wallpaper has been updated', 'info');
                         }
-                    } catch (error) {
-                        console.error('Error executing app command:', error);
+                    } else if (command.type === 'notification') {
+                        this.addNotification(command.data);
                     }
+                } catch (error) {
+                    console.error('Error executing app command:', error);
                 }
+            }
+            
+            // Add a notification
+            addNotification(data) {
+                if (!this.db || !data) return;
+                
+                const transaction = this.db.transaction(['notifications'], 'readwrite');
+                const store = transaction.objectStore('notifications');
+                
+                store.add({
+                    app: data.app || 'System',
+                    title: data.title || 'Notification',
+                    content: data.content || '',
+                    time: new Date().toISOString(),
+                    read: false
+                });
+                
+                this.loadNotifications();
             }
             
             // Render apps on desktop
@@ -895,7 +927,7 @@
                 });
             }
             
-            // Open an app
+            // Open an app - FIXED VERSION
             openApp(app) {
                 // Add to running apps
                 if (!this.runningApps.find(a => a.id === app.id)) {
@@ -903,9 +935,19 @@
                     this.addToTaskbar(app);
                 }
                 
-                // In a real implementation, this would open the app
-                // For this demo, we'll show a notification
-                this.showNotification(`Opening ${app.name}`, 'App simulation - in a real OS this would open the app', 'info');
+                // Open the app based on its type
+                if (app.type === 'web' && app.url) {
+                    // For web apps, open in new tab
+                    window.open(app.url, '_blank');
+                    this.showNotification(`Opening ${app.name}`, 'Opening app in new tab...', 'info');
+                } else if (app.type === 'internal' && app.name === 'Settings') {
+                    // For internal Settings app, open settings.html
+                    window.open('settings.html', '_blank');
+                    this.showNotification(`Opening ${app.name}`, 'Opening Settings...', 'info');
+                } else {
+                    // For other internal apps or apps without URL
+                    this.showNotification(`Opening ${app.name}`, 'App is loading...', 'info');
+                }
                 
                 // Activate the app in taskbar
                 this.activateTaskbarApp(app.id);
@@ -1136,6 +1178,39 @@
                 }
             }
             
+            // Add default apps
+            addDefaultApps() {
+                const defaultApps = [
+                    {
+                        name: 'Settings',
+                        icon: 'settings',
+                        type: 'internal',
+                        description: 'System settings and app management',
+                        pinned: true,
+                        desktopVisible: true,
+                        x: 20,
+                        y: 20
+                    },
+                    {
+                        name: 'File Explorer',
+                        icon: 'folder',
+                        type: 'internal',
+                        description: 'Browse and manage files',
+                        pinned: true,
+                        desktopVisible: true,
+                        x: 120,
+                        y: 20
+                    }
+                ];
+                
+                defaultApps.forEach(app => {
+                    this.saveApp(app);
+                });
+                
+                // Reload apps after adding
+                setTimeout(() => this.loadApps(), 300);
+            }
+            
             // Setup event listeners
             setupEventListeners() {
                 // Start button
@@ -1269,34 +1344,6 @@
                         app.style.display = appName.includes(searchTerm) ? 'flex' : 'none';
                     });
                 });
-                
-                // Add some sample apps for demonstration
-                this.addSampleApps();
-            }
-            
-            // Add sample apps for demonstration
-            addSampleApps() {
-                // Only add if no apps exist
-                if (this.apps.length > 0) return;
-                
-                const sampleApps = [
-                    { name: 'Settings', icon: 'settings', pinned: true, x: 20, y: 20, desktopVisible: true },
-                    { name: 'File Explorer', icon: 'folder', pinned: true, x: 120, y: 20, desktopVisible: true },
-                    { name: 'Browser', icon: 'public', pinned: false, x: 220, y: 20, desktopVisible: true },
-                    { name: 'Terminal', icon: 'terminal', pinned: false, x: 20, y: 130, desktopVisible: true },
-                    { name: 'Text Editor', icon: 'edit_document', pinned: false, x: 120, y: 130, desktopVisible: true },
-                    { name: 'Calculator', icon: 'calculate', pinned: true, x: 220, y: 130, desktopVisible: true },
-                    { name: 'Gallery', icon: 'photo_library', pinned: false, x: 20, y: 240, desktopVisible: true },
-                    { name: 'Music Player', icon: 'music_note', pinned: false, x: 120, y: 240, desktopVisible: true }
-                ];
-                
-                // Add to database
-                sampleApps.forEach(app => {
-                    this.saveApp(app);
-                });
-                
-                // Reload apps
-                setTimeout(() => this.loadApps(), 100);
             }
         }
         
