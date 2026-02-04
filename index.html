@@ -2,682 +2,1308 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Atlas OS</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Google Material Symbols (Rounded) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atlas OS Launcher</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-
     <style>
-        /* Custom Cursor */
-        body {
-            cursor: default;
-            overflow: hidden; /* Prevent scrolling */
-            user-select: none; /* UI feel */
+        :root {
+            --primary-color: #1a73e8;
+            --secondary-color: #34a853;
+            --background-color: #202124;
+            --taskbar-color: #2d2e30;
+            --window-color: #303134;
+            --text-color: #e8eaed;
+            --accent-color: #8ab4f8;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            --border-radius: 8px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
         }
-
-        /* Scrollbar for panels */
-        ::-webkit-scrollbar {
-            width: 6px;
+        
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            position: relative;
         }
-        ::-webkit-scrollbar-track {
-            background: transparent;
+        
+        /* Custom Cursor */
+        body, .app-icon, button, .taskbar-item {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%23e8eaed" d="M3.5 3.5L8.5 8.5L10 7L7 10L8.5 11.5L11.5 8.5L10 7L17 14L14 17L15.5 18.5L18.5 15.5L17 14L20.5 20.5H3.5V3.5Z"/></svg>') 12 12, auto;
         }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 3px;
+        
+        /* Desktop Area */
+        .desktop {
+            height: calc(100vh - 60px);
+            width: 100vw;
+            position: relative;
+            overflow: hidden;
+            background-size: cover;
+            background-position: center;
+            background-image: linear-gradient(rgba(32, 33, 36, 0.8), rgba(32, 33, 36, 0.9)), url('https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80');
         }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.4);
+        
+        /* Taskbar */
+        .taskbar {
+            height: 60px;
+            width: 100vw;
+            background-color: var(--taskbar-color);
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            z-index: 1000;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
         }
-
-        /* Glassmorphism Utilities */
-        .glass {
-            background: rgba(25, 25, 35, 0.65);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        
+        .taskbar-left {
+            display: flex;
+            align-items: center;
+            flex: 1;
         }
-
-        .glass-light {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        
+        .start-button {
+            background-color: transparent;
+            border: none;
+            color: var(--text-color);
+            font-size: 14px;
+            padding: 10px 15px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s;
         }
-
-        .icon-shadow {
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        
+        .start-button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
         }
-
-        /* App Icon Dragging State */
-        .dragging {
+        
+        .start-button .material-symbols-rounded {
+            font-size: 24px;
+        }
+        
+        .taskbar-center {
+            flex: 2;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 5px;
+            overflow-x: auto;
+            padding: 0 10px;
+            height: 100%;
+            scrollbar-width: none;
+        }
+        
+        .taskbar-center::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .taskbar-item {
+            height: 45px;
+            min-width: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            padding: 0 10px;
+            background-color: transparent;
+            border: none;
+            color: var(--text-color);
+            transition: background-color 0.2s;
+            font-size: 12px;
+            gap: 8px;
+        }
+        
+        .taskbar-item.active {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+        
+        .taskbar-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .taskbar-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .time-display {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            cursor: pointer;
+        }
+        
+        .time-display:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .time {
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .date {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        /* Startup Panel */
+        .startup-panel {
+            position: absolute;
+            bottom: 65px;
+            left: 20px;
+            width: 500px;
+            height: 500px;
+            background-color: var(--window-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            z-index: 1001;
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            overflow: hidden;
+        }
+        
+        .startup-panel.active {
+            display: grid;
+        }
+        
+        .startup-search {
+            grid-column: 1 / -1;
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 15px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 20px;
+            color: var(--text-color);
+            font-size: 14px;
+        }
+        
+        .startup-apps {
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .startup-pinned {
+            padding: 20px;
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
+        }
+        
+        .startup-footer {
+            grid-column: 1 / -1;
+            padding: 15px 20px;
+            background-color: rgba(0, 0, 0, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .power-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .power-button {
+            padding: 8px 15px;
+            border-radius: 4px;
+            border: none;
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s;
+        }
+        
+        .power-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Clock Panel */
+        .clock-panel {
+            position: absolute;
+            bottom: 65px;
+            right: 20px;
+            width: 300px;
+            max-height: 400px;
+            background-color: var(--window-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            z-index: 1001;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .clock-panel.active {
+            display: flex;
+        }
+        
+        .clock-display {
+            padding: 20px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .clock-time {
+            font-size: 32px;
+            font-weight: 300;
+        }
+        
+        .clock-date {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+        
+        .notifications {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 0;
+        }
+        
+        .notification-item {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+        
+        .notification-item.unread {
+            background-color: rgba(26, 115, 232, 0.1);
+        }
+        
+        .notification-icon {
+            font-size: 20px;
+            color: var(--accent-color);
+        }
+        
+        .notification-content {
+            flex: 1;
+        }
+        
+        .notification-title {
+            font-weight: 500;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        
+        .notification-text {
+            font-size: 12px;
+            opacity: 0.8;
+            line-height: 1.4;
+        }
+        
+        .notification-time {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-top: 4px;
+        }
+        
+        .notification-actions {
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Desktop Apps */
+        .desktop-apps {
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-content: flex-start;
+        }
+        
+        .app-icon {
+            width: 80px;
+            height: 90px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            padding: 10px;
+            transition: all 0.2s;
+            position: absolute;
+            cursor: pointer;
+        }
+        
+        .app-icon:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .app-icon.dragging {
+            opacity: 0.7;
+            z-index: 100;
+        }
+        
+        .app-icon .material-symbols-rounded {
+            font-size: 32px;
+            margin-bottom: 8px;
+            color: var(--accent-color);
+        }
+        
+        .app-name {
+            font-size: 12px;
+            text-align: center;
+            word-break: break-word;
+        }
+        
+        /* Right Click Menu */
+        .context-menu {
+            position: absolute;
+            background-color: var(--window-color);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            min-width: 180px;
+            overflow: hidden;
+        }
+        
+        .context-menu.active {
+            display: flex;
+        }
+        
+        .context-item {
+            padding: 10px 15px;
+            border: none;
+            background: none;
+            color: var(--text-color);
+            text-align: left;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: background-color 0.2s;
+        }
+        
+        .context-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .context-item .material-symbols-rounded {
+            font-size: 18px;
+        }
+        
+        .divider {
+            height: 1px;
+            background-color: rgba(255, 255, 255, 0.1);
+            width: 100%;
+        }
+        
+        /* System Notifications */
+        .system-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: var(--window-color);
+            border-radius: var(--border-radius);
+            padding: 15px 20px;
+            box-shadow: var(--shadow);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transform: translateX(120%);
+            transition: transform 0.3s ease;
+            max-width: 300px;
+        }
+        
+        .system-notification.show {
+            transform: translateX(0);
+        }
+        
+        /* Empty State */
+        .empty-state {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
             opacity: 0.5;
-            transform: scale(1.05);
         }
-
-        /* Animations */
-        .panel-transition {
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        
+        .empty-state .material-symbols-rounded {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: var(--accent-color);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .startup-panel {
+                width: 90vw;
+                left: 5vw;
+            }
+            
+            .clock-panel {
+                width: 90vw;
+                right: 5vw;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-900 text-white h-screen w-screen overflow-hidden relative" oncontextmenu="return false;">
-
+<body>
     <!-- Desktop Area -->
-    <div id="desktop" class="absolute top-0 left-0 w-full h-[calc(100%-3rem)] z-0" 
-         ondragover="allowDrop(event)" ondrop="dropApp(event)">
-        
-        <!-- Wallpaper (Dynamic via CSS/JS) -->
-        <div id="wallpaper" class="absolute inset-0 z-[-1] bg-gradient-to-br from-indigo-900 via-purple-900 to-black"></div>
-
-        <!-- Desktop Apps Container (Dynamic) -->
-        <div id="desktop-apps" class="w-full h-full relative">
-            <!-- App icons will be injected here -->
-        </div>
-    </div>
-
-    <!-- Context Menu (Right Click) -->
-    <div id="context-menu" class="fixed hidden z-50 glass rounded-lg w-48 py-1 text-sm shadow-xl transform scale-95 opacity-0 transition-opacity duration-100 origin-top-left">
-        <button onclick="handleContextAction('open')" class="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-2">
-            <span class="material-symbols-rounded text-lg">open_in_new</span> Open
-        </button>
-        <div class="h-px bg-white/10 my-1"></div>
-        <button onclick="handleContextAction('copy')" class="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-2">
-            <span class="material-symbols-rounded text-lg">content_copy</span> Copy
-        </button>
-        <button onclick="handleContextAction('cut')" class="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-2">
-            <span class="material-symbols-rounded text-lg">content_cut</span> Cut
-        </button>
-        <div class="h-px bg-white/10 my-1"></div>
-        <button onclick="handleContextAction('remove')" class="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-2 text-yellow-300">
-            <span class="material-symbols-rounded text-lg">remove_circle</span> Remove
-        </button>
-        <button onclick="handleContextAction('delete')" class="w-full text-left px-4 py-2 hover:bg-white/10 flex items-center gap-2 text-red-400">
-            <span class="material-symbols-rounded text-lg">delete</span> Delete
-        </button>
-    </div>
-
-    <!-- Start Menu Panel -->
-    <div id="start-menu" class="fixed bottom-14 left-2 w-[32rem] h-[36rem] glass rounded-xl z-40 hidden flex-col panel-transition transform translate-y-4 opacity-0">
-        <!-- Search -->
-        <div class="p-4 pb-2">
-            <div class="glass-light rounded-lg flex items-center px-3 py-2">
-                <span class="material-symbols-rounded text-gray-400">search</span>
-                <input type="text" placeholder="Search apps, settings, and documents" class="bg-transparent border-none outline-none text-white ml-2 w-full placeholder-gray-400 text-sm">
-            </div>
-        </div>
-
-        <div class="flex-1 flex overflow-hidden">
-            <!-- All Apps List -->
-            <div class="w-1/2 p-2 overflow-y-auto border-r border-white/5">
-                <div class="text-xs font-semibold text-gray-400 px-3 mb-2 uppercase tracking-wider">All Apps</div>
-                <div id="start-menu-apps">
-                    <!-- Dynamic App List -->
-                    <div class="p-4 text-center text-gray-500 text-sm italic">No apps installed.</div>
-                </div>
-            </div>
-
-            <!-- Pinned Tools -->
-            <div class="w-1/2 p-4 bg-black/20">
-                <div class="text-xs font-semibold text-gray-400 mb-4 uppercase tracking-wider">Pinned</div>
-                <div class="grid grid-cols-3 gap-4">
-                    <!-- Mock Pinned Items -->
-                    <div class="flex flex-col items-center gap-1 group cursor-pointer">
-                        <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg group-hover:bg-blue-500 transition">
-                            <span class="material-symbols-rounded">settings</span>
-                        </div>
-                        <span class="text-xs">Settings</span>
-                    </div>
-                    <div class="flex flex-col items-center gap-1 group cursor-pointer">
-                        <div class="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center shadow-lg group-hover:bg-green-500 transition">
-                            <span class="material-symbols-rounded">folder</span>
-                        </div>
-                        <span class="text-xs">Files</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bottom Bar (User/Power) -->
-        <div class="p-3 bg-black/40 flex justify-between items-center rounded-b-xl border-t border-white/10">
-            <div class="flex items-center gap-2 px-2">
-                <div class="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 to-orange-400 flex items-center justify-center text-xs font-bold">U</div>
-                <span class="text-sm font-medium">User</span>
-            </div>
-            <div class="flex gap-2">
-                <button title="Restart" class="p-2 hover:bg-white/10 rounded-md transition" onclick="alert('System Restarting...')">
-                    <span class="material-symbols-rounded text-lg">restart_alt</span>
-                </button>
-                <button title="Shutdown" class="p-2 hover:bg-white/10 rounded-md transition text-red-400" onclick="alert('System Shutting Down...')">
-                    <span class="material-symbols-rounded text-lg">power_settings_new</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Clock & Notification Panel -->
-    <div id="clock-panel" class="fixed bottom-14 right-2 w-80 h-96 glass rounded-xl z-40 hidden flex-col panel-transition transform translate-y-4 opacity-0">
-        <div class="p-6 border-b border-white/10 text-center">
-            <div id="panel-time" class="text-4xl font-light tracking-tight">12:00</div>
-            <div id="panel-date" class="text-blue-200 text-sm mt-1">Monday, January 1</div>
+    <div class="desktop" id="desktop">
+        <div class="desktop-apps" id="desktopApps">
+            <!-- Apps will be dynamically added here -->
         </div>
         
-        <div class="flex-1 overflow-hidden flex flex-col">
-            <div class="flex justify-between items-center p-3 px-4">
-                <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Notifications</span>
-                <button onclick="clearNotifications()" class="text-xs text-blue-300 hover:text-white transition">Clear All</button>
-            </div>
-            
-            <div id="notification-list" class="flex-1 overflow-y-auto p-2 space-y-2">
-                <!-- Notifications go here -->
-                <div class="text-center text-gray-500 text-xs mt-10">No new notifications</div>
-            </div>
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState">
+            <span class="material-symbols-rounded">desktop_windows</span>
+            <p>No apps installed. Use Settings to add apps.</p>
         </div>
     </div>
-
+    
     <!-- Taskbar -->
-    <div class="absolute bottom-0 left-0 w-full h-12 glass z-50 flex justify-between items-center px-2 select-none">
-        
-        <!-- Start Button -->
-        <div class="flex items-center">
-            <button onclick="toggleStartMenu()" class="w-10 h-10 rounded-md hover:bg-white/10 flex items-center justify-center transition active:scale-95 group relative">
-                <span class="material-symbols-rounded text-2xl text-blue-400 group-hover:text-blue-300 transition-colors">grid_view</span>
-                <div class="absolute -top-1 w-1 h-1 bg-white rounded-full opacity-0 group-hover:opacity-100"></div>
+    <div class="taskbar">
+        <div class="taskbar-left">
+            <button class="start-button" id="startButton">
+                <span class="material-symbols-rounded">home</span>
+                <span>Start</span>
             </button>
         </div>
-
-        <!-- Active Apps / Tabs -->
-        <div id="taskbar-apps" class="flex-1 flex justify-center gap-1 mx-4 overflow-x-auto h-full items-center">
-            <!-- App instances appear here -->
+        
+        <div class="taskbar-center" id="taskbarCenter">
+            <!-- Running apps will appear here -->
         </div>
-
-        <!-- System Tray -->
-        <div class="flex items-center h-full gap-1">
-            <div class="flex items-center gap-1 px-2">
-                <span class="material-symbols-rounded text-xs">wifi</span>
-                <span class="material-symbols-rounded text-xs">volume_up</span>
-                <span class="material-symbols-rounded text-xs">battery_full</span>
+        
+        <div class="taskbar-right">
+            <div class="time-display" id="timeDisplay">
+                <div class="time" id="currentTime">00:00 AM</div>
+                <div class="date" id="currentDate">Mon, Jan 1</div>
             </div>
-            
-            <!-- Clock Button -->
-            <button onclick="toggleClockPanel()" class="h-full px-3 hover:bg-white/10 rounded-md transition flex flex-col justify-center items-end min-w-[70px]">
-                <span id="taskbar-time" class="text-sm font-medium leading-none">12:00</span>
-                <span id="taskbar-date" class="text-[10px] text-gray-300 leading-none mt-1">10/24/2023</span>
+        </div>
+    </div>
+    
+    <!-- Startup Panel -->
+    <div class="startup-panel" id="startupPanel">
+        <div class="startup-search">
+            <input type="text" class="search-input" id="appSearch" placeholder="Search apps and tools...">
+        </div>
+        
+        <div class="startup-apps">
+            <h3 style="margin-bottom: 15px; font-size: 16px;">All Apps</h3>
+            <div id="allAppsList">
+                <!-- All apps will be dynamically added here -->
+            </div>
+        </div>
+        
+        <div class="startup-pinned">
+            <h3 style="margin-bottom: 15px; font-size: 16px;">Pinned Tools</h3>
+            <div id="pinnedAppsList">
+                <!-- Pinned apps will be dynamically added here -->
+            </div>
+        </div>
+        
+        <div class="startup-footer">
+            <div class="user-info">
+                <span class="material-symbols-rounded" style="vertical-align: middle; margin-right: 8px;">account_circle</span>
+                <span>Atlas User</span>
+            </div>
+            <div class="power-buttons">
+                <button class="power-button" id="restartButton">
+                    <span class="material-symbols-rounded">restart_alt</span>
+                    <span>Restart</span>
+                </button>
+                <button class="power-button" id="shutdownButton">
+                    <span class="material-symbols-rounded">power_settings_new</span>
+                    <span>Shutdown</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Clock Panel -->
+    <div class="clock-panel" id="clockPanel">
+        <div class="clock-display">
+            <div class="clock-time" id="detailedTime">00:00:00 AM</div>
+            <div class="clock-date" id="detailedDate">Monday, January 1, 2023</div>
+        </div>
+        
+        <div class="notifications" id="notificationsList">
+            <!-- Notifications will appear here -->
+            <div class="notification-item unread">
+                <span class="material-symbols-rounded notification-icon">notifications</span>
+                <div class="notification-content">
+                    <div class="notification-title">Welcome to Atlas OS</div>
+                    <div class="notification-text">Your operating system is ready. You can now install apps from the Settings.</div>
+                    <div class="notification-time">Just now</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="notification-actions">
+            <button class="power-button" id="clearNotifications">
+                <span class="material-symbols-rounded">delete_sweep</span>
+                <span>Clear All</span>
+            </button>
+            <button class="power-button" id="notificationSettings">
+                <span class="material-symbols-rounded">settings</span>
+                <span>Settings</span>
             </button>
         </div>
     </div>
+    
+    <!-- Right Click Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <button class="context-item" id="contextOpen">
+            <span class="material-symbols-rounded">open_in_new</span>
+            <span>Open</span>
+        </button>
+        <button class="context-item" id="contextPin">
+            <span class="material-symbols-rounded">push_pin</span>
+            <span>Pin to Start</span>
+        </button>
+        <div class="divider"></div>
+        <button class="context-item" id="contextCut">
+            <span class="material-symbols-rounded">content_cut</span>
+            <span>Cut</span>
+        </button>
+        <button class="context-item" id="contextCopy">
+            <span class="material-symbols-rounded">content_copy</span>
+            <span>Copy</span>
+        </button>
+        <div class="divider"></div>
+        <button class="context-item" id="contextRemove">
+            <span class="material-symbols-rounded">remove_circle</span>
+            <span>Remove from Desktop</span>
+        </button>
+        <button class="context-item" id="contextDelete" style="color: #f28b82;">
+            <span class="material-symbols-rounded">delete</span>
+            <span>Delete</span>
+        </button>
+    </div>
+    
+    <!-- System Notification -->
+    <div class="system-notification" id="systemNotification">
+        <span class="material-symbols-rounded" id="notificationIcon">info</span>
+        <div>
+            <div id="notificationTitle">Notification</div>
+            <div id="notificationMessage">This is a system notification</div>
+        </div>
+    </div>
 
-    <!-- Initialization Script -->
     <script>
-        // --- Core System State ---
-        const System = {
-            db: null,
-            state: {
-                isStartOpen: false,
-                isClockOpen: false,
-                contextMenuTarget: null, // 'desktop' or appId
-                contextTargetId: null,
-                apps: [],
-                notifications: [],
-                runningApps: []
+        // Atlas Launcher Core
+        class AtlasLauncher {
+            constructor() {
+                // Database setup
+                this.db = null;
+                this.dbName = 'AtlasDB';
+                this.dbVersion = 1;
+                
+                // App data
+                this.apps = [];
+                this.notifications = [];
+                this.runningApps = [];
+                
+                // UI elements
+                this.desktop = document.getElementById('desktop');
+                this.desktopApps = document.getElementById('desktopApps');
+                this.taskbarCenter = document.getElementById('taskbarCenter');
+                this.startupPanel = document.getElementById('startupPanel');
+                this.clockPanel = document.getElementById('clockPanel');
+                this.contextMenu = document.getElementById('contextMenu');
+                
+                // Initialize
+                this.initDB();
+                this.setupEventListeners();
+                this.updateTime();
+                setInterval(() => this.updateTime(), 1000);
+                
+                // Default empty state
+                this.updateEmptyState();
             }
-        };
-
-        // --- Utils ---
-        const $ = (id) => document.getElementById(id);
-        const formatTime = (date) => date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const formatDate = (date) => date.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
-        const formatDateShort = (date) => date.toLocaleDateString();
-
-        // --- IndexedDB: AtlasDB ---
-        const initDB = () => {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open("AtlasDB", 1);
-
-                request.onupgradeneeded = (event) => {
-                    const db = event.target.result;
-                    
-                    // Store for installed apps
-                    // Schema: { id, name, icon, url, x, y (desktop position) }
-                    if (!db.objectStoreNames.contains("apps")) {
-                        db.createObjectStore("apps", { keyPath: "id" });
-                    }
-
-                    // Store for notifications
-                    // Schema: { id, appName, context, time, read }
-                    if (!db.objectStoreNames.contains("notifications")) {
-                        db.createObjectStore("notifications", { keyPath: "id", autoIncrement: true });
-                    }
-
-                    // Store for IPC (Inter-Process Communication)
-                    // Schema: { id: "command", code: "js_code_string", timestamp }
-                    if (!db.objectStoreNames.contains("appexecute")) {
-                        db.createObjectStore("appexecute", { keyPath: "id" });
-                    }
-                };
-
-                request.onsuccess = (event) => {
-                    System.db = event.target.result;
-                    console.log("AtlasDB Initialized");
-                    loadApps();
-                    loadNotifications();
-                    startAppExecuteListener();
-                    resolve(System.db);
-                };
-
+            
+            // Initialize IndexedDB
+            initDB() {
+                const request = indexedDB.open(this.dbName, this.dbVersion);
+                
                 request.onerror = (event) => {
-                    console.error("AtlasDB Error:", event.target.error);
-                    reject(event.target.error);
+                    console.error('Database error:', event.target.error);
+                    this.showNotification('Database Error', 'Failed to initialize AtlasDB', 'error');
                 };
-            });
-        };
-
-        // --- Database Operations ---
-        const dbOp = (storeName, mode, callback) => {
-            if (!System.db) return;
-            const transaction = System.db.transaction([storeName], mode);
-            const store = transaction.objectStore(storeName);
-            const request = callback(store);
-            return new Promise((resolve, reject) => {
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = () => reject(request.error);
-            });
-        };
-
-        // --- Loader Functions ---
-        const loadApps = async () => {
-            const apps = await dbOp("apps", "readonly", store => store.getAll());
-            System.state.apps = apps || [];
-            renderDesktopIcons();
-            renderStartMenuApps();
-        };
-
-        const loadNotifications = async () => {
-            const notifs = await dbOp("notifications", "readonly", store => store.getAll());
-            System.state.notifications = notifs || [];
-            renderNotifications();
-        };
-
-        // --- UI Rendering ---
-        const renderDesktopIcons = () => {
-            const container = $("desktop-apps");
-            container.innerHTML = "";
+                
+                request.onupgradeneeded = (event) => {
+                    this.db = event.target.result;
+                    
+                    // Create object stores (folders)
+                    if (!this.db.objectStoreNames.contains('apps')) {
+                        const appStore = this.db.createObjectStore('apps', { keyPath: 'id', autoIncrement: true });
+                        appStore.createIndex('name', 'name', { unique: false });
+                        appStore.createIndex('pinned', 'pinned', { unique: false });
+                    }
+                    
+                    if (!this.db.objectStoreNames.contains('notifications')) {
+                        const notificationStore = this.db.createObjectStore('notifications', { keyPath: 'id', autoIncrement: true });
+                        notificationStore.createIndex('app', 'app', { unique: false });
+                        notificationStore.createIndex('read', 'read', { unique: false });
+                    }
+                    
+                    if (!this.db.objectStoreNames.contains('appexecute')) {
+                        this.db.createObjectStore('appexecute', { keyPath: 'id', autoIncrement: true });
+                    }
+                    
+                    // Add a default notification
+                    const transaction = event.target.transaction;
+                    const notificationStore = transaction.objectStore('notifications');
+                    notificationStore.add({
+                        app: 'System',
+                        title: 'Welcome to Atlas OS',
+                        content: 'Your operating system is ready. You can now install apps from the Settings.',
+                        time: new Date().toISOString(),
+                        read: false
+                    });
+                };
+                
+                request.onsuccess = (event) => {
+                    this.db = event.target.result;
+                    this.loadApps();
+                    this.loadNotifications();
+                    this.monitorAppExecute();
+                };
+            }
             
-            System.state.apps.forEach(app => {
-                const el = document.createElement("div");
-                el.className = "absolute flex flex-col items-center gap-1 w-20 p-2 rounded hover:bg-white/10 cursor-pointer transition-colors group";
-                // Default position if not set
-                el.style.left = (app.x || 10) + "px";
-                el.style.top = (app.y || 10) + "px";
-                el.draggable = true;
-                el.id = `app-${app.id}`;
-                el.dataset.id = app.id;
+            // Load apps from database
+            loadApps() {
+                if (!this.db) return;
                 
-                el.innerHTML = `
-                    <div class="w-12 h-12 bg-gray-800 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform text-white">
-                        <span class="material-symbols-rounded text-3xl">${app.icon || 'apps'}</span>
-                    </div>
-                    <span class="text-xs text-center font-medium drop-shadow-md line-clamp-2 leading-tight select-none icon-shadow">${app.name}</span>
-                `;
-
-                // Drag Events
-                el.addEventListener('dragstart', (e) => {
-                    e.dataTransfer.setData("text/plain", app.id);
-                    e.dataTransfer.effectAllowed = "move";
-                    el.classList.add('dragging');
-                    // Calculate offset to prevent snapping to corner
-                    const rect = el.getBoundingClientRect();
-                    e.dataTransfer.setData("offsetX", e.clientX - rect.left);
-                    e.dataTransfer.setData("offsetY", e.clientY - rect.top);
-                });
-
-                el.addEventListener('dragend', () => {
-                    el.classList.remove('dragging');
-                });
-
-                // Right click
-                el.addEventListener('contextmenu', (e) => {
-                    e.stopPropagation(); // Don't trigger desktop context menu
-                    showContextMenu(e, 'app', app.id);
-                });
-
-                // Double click to open
-                el.addEventListener('dblclick', () => openApp(app));
-
-                container.appendChild(el);
-            });
-        };
-
-        const renderStartMenuApps = () => {
-            const container = $("start-menu-apps");
-            if (System.state.apps.length === 0) {
-                container.innerHTML = '<div class="p-4 text-center text-gray-500 text-sm italic">No apps installed.</div>';
-                return;
-            }
-            container.innerHTML = "";
-            System.state.apps.forEach(app => {
-                const el = document.createElement("div");
-                el.className = "flex items-center gap-3 p-2 hover:bg-white/10 rounded cursor-pointer transition";
-                el.onclick = () => { openApp(app); toggleStartMenu(); };
-                el.innerHTML = `
-                    <div class="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center text-white">
-                        <span class="material-symbols-rounded text-lg">${app.icon || 'apps'}</span>
-                    </div>
-                    <span class="text-sm">${app.name}</span>
-                `;
-                container.appendChild(el);
-            });
-        };
-
-        const renderNotifications = () => {
-            const container = $("notification-list");
-            if (System.state.notifications.length === 0) {
-                container.innerHTML = '<div class="text-center text-gray-500 text-xs mt-10">No new notifications</div>';
-                return;
-            }
-            container.innerHTML = "";
-            System.state.notifications.forEach(notif => {
-                const el = document.createElement("div");
-                el.className = "bg-white/5 p-3 rounded hover:bg-white/10 transition border border-white/5 relative group";
-                el.innerHTML = `
-                    <div class="flex justify-between items-start mb-1">
-                        <span class="text-xs font-bold text-blue-300">${notif.appName || 'System'}</span>
-                        <span class="text-[10px] text-gray-400">${new Date(notif.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-                    </div>
-                    <div class="text-sm text-gray-200">${notif.context}</div>
-                    <button onclick="deleteNotification(${notif.id})" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white transition">
-                        <span class="material-symbols-rounded text-sm">close</span>
-                    </button>
-                `;
-                container.appendChild(el);
-            });
-        };
-
-        // --- Logic: Drag and Drop ---
-        const allowDrop = (ev) => {
-            ev.preventDefault();
-        };
-
-        const dropApp = (ev) => {
-            ev.preventDefault();
-            const appId = ev.dataTransfer.getData("text/plain");
-            if (!appId) return;
-
-            const offsetX = parseInt(ev.dataTransfer.getData("offsetX") || 0);
-            const offsetY = parseInt(ev.dataTransfer.getData("offsetY") || 0);
-
-            const x = ev.clientX - offsetX;
-            const y = ev.clientY - offsetY;
-
-            // Update local state
-            const appIndex = System.state.apps.findIndex(a => a.id.toString() === appId);
-            if (appIndex > -1) {
-                System.state.apps[appIndex].x = x;
-                System.state.apps[appIndex].y = y;
-
-                // Persist to DB
-                dbOp("apps", "readwrite", store => store.put(System.state.apps[appIndex]));
+                const transaction = this.db.transaction(['apps'], 'readonly');
+                const store = transaction.objectStore('apps');
+                const request = store.getAll();
                 
-                // Re-render
-                renderDesktopIcons();
+                request.onsuccess = (event) => {
+                    this.apps = event.target.result || [];
+                    this.renderDesktopApps();
+                    this.renderStartupApps();
+                    this.updateEmptyState();
+                };
             }
-        };
-
-        // --- Logic: AppExecute (IPC) ---
-        // Simulating the "launcher executes code" requirement
-        const startAppExecuteListener = () => {
-            // Since IDB events aren't real-time across contexts without complex setup, 
-            // we will poll the 'appexecute' table every 2 seconds.
-            setInterval(async () => {
-                try {
-                    const commands = await dbOp("appexecute", "readwrite", store => store.getAll());
-                    if (commands && commands.length > 0) {
-                        for (const cmd of commands) {
-                            console.log("Executing IPC Command:", cmd.id);
+            
+            // Load notifications from database
+            loadNotifications() {
+                if (!this.db) return;
+                
+                const transaction = this.db.transaction(['notifications'], 'readonly');
+                const store = transaction.objectStore('notifications');
+                const request = store.getAll();
+                
+                request.onsuccess = (event) => {
+                    this.notifications = event.target.result || [];
+                    this.renderNotifications();
+                };
+            }
+            
+            // Monitor appexecute folder for commands
+            monitorAppExecute() {
+                if (!this.db) return;
+                
+                // This would typically use IndexedDB events or polling
+                // For this demo, we'll simulate checking for commands
+                setInterval(() => {
+                    const transaction = this.db.transaction(['appexecute'], 'readonly');
+                    const store = transaction.objectStore('appexecute');
+                    const request = store.getAll();
+                    
+                    request.onsuccess = (event) => {
+                        const commands = event.target.result || [];
+                        commands.forEach(command => {
+                            this.executeAppCommand(command);
                             
-                            // DANGEROUS IN REALITY, BUT REQUESTED BY PROMPT
-                            try {
-                                // Execute the code provided by the app
-                                const func = new Function(cmd.code);
-                                func();
-                            } catch (e) {
-                                console.error("IPC Execution Failed:", e);
+                            // Remove command after execution
+                            const deleteTransaction = this.db.transaction(['appexecute'], 'readwrite');
+                            const deleteStore = deleteTransaction.objectStore('appexecute');
+                            deleteStore.delete(command.id);
+                        });
+                    };
+                }, 1000);
+            }
+            
+            // Execute commands from apps
+            executeAppCommand(command) {
+                if (command.script) {
+                    try {
+                        // Execute the script (in a real scenario, this would be more secure)
+                        console.log('Executing app command:', command);
+                        
+                        // Example: Change wallpaper
+                        if (command.script.includes('wallpaper')) {
+                            const urlMatch = command.script.match(/url\(['"]([^'"]+)['"]\)/);
+                            if (urlMatch) {
+                                this.desktop.style.backgroundImage = `linear-gradient(rgba(32, 33, 36, 0.8), rgba(32, 33, 36, 0.9)), url('${urlMatch[1]}')`;
+                                this.showNotification('Wallpaper Changed', 'Gallery app updated your wallpaper', 'info');
                             }
-
-                            // Clean up executed command
-                            await dbOp("appexecute", "readwrite", store => store.delete(cmd.id));
                         }
+                    } catch (error) {
+                        console.error('Error executing app command:', error);
                     }
-                } catch (err) {
-                    console.error("IPC Poll Error", err);
                 }
-            }, 2000);
-        };
-
-        // --- Logic: Notifications ---
-        const clearNotifications = async () => {
-            const notifs = System.state.notifications;
-            for (const n of notifs) {
-                await dbOp("notifications", "readwrite", store => store.delete(n.id));
             }
-            loadNotifications();
-        };
-        
-        const deleteNotification = async (id) => {
-             await dbOp("notifications", "readwrite", store => store.delete(id));
-             loadNotifications();
-        }
-
-        // --- Logic: UI Toggles ---
-        const toggleStartMenu = () => {
-            const menu = $("start-menu");
-            const clock = $("clock-panel");
             
-            if (System.state.isClockOpen) toggleClockPanel();
-
-            if (System.state.isStartOpen) {
-                menu.classList.remove("opacity-100", "translate-y-0");
-                menu.classList.add("opacity-0", "translate-y-4");
-                setTimeout(() => menu.classList.add("hidden"), 200);
-            } else {
-                menu.classList.remove("hidden");
-                // Small delay to allow display:block to apply before opacity transition
-                requestAnimationFrame(() => {
-                    menu.classList.remove("opacity-0", "translate-y-4");
-                    menu.classList.add("opacity-100", "translate-y-0");
-                });
-            }
-            System.state.isStartOpen = !System.state.isStartOpen;
-        };
-
-        const toggleClockPanel = () => {
-            const menu = $("start-menu");
-            const clock = $("clock-panel");
-            
-            if (System.state.isStartOpen) toggleStartMenu();
-
-            if (System.state.isClockOpen) {
-                clock.classList.remove("opacity-100", "translate-y-0");
-                clock.classList.add("opacity-0", "translate-y-4");
-                setTimeout(() => clock.classList.add("hidden"), 200);
-            } else {
-                clock.classList.remove("hidden");
-                requestAnimationFrame(() => {
-                    clock.classList.remove("opacity-0", "translate-y-4");
-                    clock.classList.add("opacity-100", "translate-y-0");
-                });
-            }
-            System.state.isClockOpen = !System.state.isClockOpen;
-        };
-
-        const updateClock = () => {
-            const now = new Date();
-            $("taskbar-time").innerText = formatTime(now);
-            $("taskbar-date").innerText = formatDateShort(now);
-            
-            if (System.state.isClockOpen) {
-                $("panel-time").innerText = formatTime(now);
-                $("panel-date").innerText = formatDate(now);
-            }
-        };
-
-        // --- Logic: Context Menu ---
-        const showContextMenu = (e, type, id = null) => {
-            e.preventDefault();
-            const menu = $("context-menu");
-            
-            System.state.contextMenuTarget = type;
-            System.state.contextTargetId = id;
-
-            // Position
-            let x = e.clientX;
-            let y = e.clientY;
-            
-            // Boundary checks
-            if (x + 200 > window.innerWidth) x = window.innerWidth - 200;
-            if (y + 250 > window.innerHeight) y = window.innerHeight - 250;
-
-            menu.style.left = `${x}px`;
-            menu.style.top = `${y}px`;
-            
-            menu.classList.remove("hidden");
-            requestAnimationFrame(() => {
-                menu.classList.remove("opacity-0", "scale-95");
-                menu.classList.add("opacity-100", "scale-100");
-            });
-        };
-
-        const hideContextMenu = () => {
-            const menu = $("context-menu");
-            menu.classList.remove("opacity-100", "scale-100");
-            menu.classList.add("opacity-0", "scale-95");
-            setTimeout(() => menu.classList.add("hidden"), 100);
-        };
-
-        const handleContextAction = async (action) => {
-            const targetId = System.state.contextTargetId;
-            const targetType = System.state.contextMenuTarget;
-            
-            console.log(`Action: ${action} on ${targetType} ${targetId}`);
-
-            if (targetType === 'app' && targetId) {
-                const app = System.state.apps.find(a => a.id === targetId);
+            // Render apps on desktop
+            renderDesktopApps() {
+                this.desktopApps.innerHTML = '';
                 
-                if (action === 'delete' || action === 'remove') {
-                    if(confirm(`Are you sure you want to delete ${app.name}?`)) {
-                        await dbOp("apps", "readwrite", store => store.delete(targetId));
-                        loadApps();
+                this.apps.forEach(app => {
+                    if (app.desktopVisible !== false) {
+                        const appElement = this.createAppElement(app);
+                        this.desktopApps.appendChild(appElement);
                     }
-                } else if (action === 'open') {
-                    openApp(app);
-                } else if (action === 'copy') {
-                    // Logic to duplicate app entry in DB could go here
+                });
+            }
+            
+            // Render apps in startup panel
+            renderStartupApps() {
+                const allAppsList = document.getElementById('allAppsList');
+                const pinnedAppsList = document.getElementById('pinnedAppsList');
+                
+                allAppsList.innerHTML = '';
+                pinnedAppsList.innerHTML = '';
+                
+                this.apps.forEach(app => {
+                    const appElement = this.createStartupAppElement(app);
+                    
+                    if (app.pinned) {
+                        pinnedAppsList.appendChild(appElement.cloneNode(true));
+                    }
+                    
+                    allAppsList.appendChild(appElement);
+                });
+            }
+            
+            // Create desktop app element
+            createAppElement(app) {
+                const appElement = document.createElement('div');
+                appElement.className = 'app-icon';
+                appElement.dataset.appId = app.id;
+                appElement.style.left = `${app.x || 20}px`;
+                appElement.style.top = `${app.y || 20}px`;
+                
+                appElement.innerHTML = `
+                    <span class="material-symbols-rounded">${app.icon || 'apps'}</span>
+                    <div class="app-name">${app.name || 'App'}</div>
+                `;
+                
+                // Add event listeners
+                appElement.addEventListener('click', (e) => {
+                    if (!this.isDragging) {
+                        this.openApp(app);
+                    }
+                });
+                
+                appElement.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    this.showContextMenu(e, app);
+                });
+                
+                // Drag and drop functionality
+                this.makeDraggable(appElement, app);
+                
+                return appElement;
+            }
+            
+            // Create startup panel app element
+            createStartupAppElement(app) {
+                const appElement = document.createElement('button');
+                appElement.className = 'taskbar-item';
+                appElement.style.justifyContent = 'flex-start';
+                appElement.style.width = '100%';
+                appElement.style.marginBottom = '5px';
+                
+                appElement.innerHTML = `
+                    <span class="material-symbols-rounded">${app.icon || 'apps'}</span>
+                    <span>${app.name || 'App'}</span>
+                `;
+                
+                appElement.addEventListener('click', () => {
+                    this.openApp(app);
+                    this.toggleStartupPanel();
+                });
+                
+                return appElement;
+            }
+            
+            // Make an element draggable
+            makeDraggable(element, app) {
+                let isDragging = false;
+                let offsetX, offsetY;
+                
+                element.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return; // Only left click
+                    
+                    isDragging = true;
+                    this.isDragging = true;
+                    offsetX = e.clientX - element.offsetLeft;
+                    offsetY = e.clientY - element.offsetTop;
+                    
+                    element.classList.add('dragging');
+                    
+                    const mouseMoveHandler = (e) => {
+                        if (isDragging) {
+                            element.style.left = `${e.clientX - offsetX}px`;
+                            element.style.top = `${e.clientY - offsetY}px`;
+                        }
+                    };
+                    
+                    const mouseUpHandler = () => {
+                        isDragging = false;
+                        this.isDragging = false;
+                        element.classList.remove('dragging');
+                        
+                        // Save new position to database
+                        app.x = parseInt(element.style.left);
+                        app.y = parseInt(element.style.top);
+                        
+                        this.saveApp(app);
+                        
+                        document.removeEventListener('mousemove', mouseMoveHandler);
+                        document.removeEventListener('mouseup', mouseUpHandler);
+                    };
+                    
+                    document.addEventListener('mousemove', mouseMoveHandler);
+                    document.addEventListener('mouseup', mouseUpHandler);
+                });
+            }
+            
+            // Open an app
+            openApp(app) {
+                // Add to running apps
+                if (!this.runningApps.find(a => a.id === app.id)) {
+                    this.runningApps.push(app);
+                    this.addToTaskbar(app);
+                }
+                
+                // In a real implementation, this would open the app
+                // For this demo, we'll show a notification
+                this.showNotification(`Opening ${app.name}`, 'App simulation - in a real OS this would open the app', 'info');
+                
+                // Activate the app in taskbar
+                this.activateTaskbarApp(app.id);
+            }
+            
+            // Add app to taskbar
+            addToTaskbar(app) {
+                const taskbarItem = document.createElement('button');
+                taskbarItem.className = 'taskbar-item';
+                taskbarItem.dataset.appId = app.id;
+                
+                taskbarItem.innerHTML = `
+                    <span class="material-symbols-rounded">${app.icon || 'apps'}</span>
+                    <span>${app.name || 'App'}</span>
+                `;
+                
+                taskbarItem.addEventListener('click', () => {
+                    this.activateTaskbarApp(app.id);
+                });
+                
+                this.taskbarCenter.appendChild(taskbarItem);
+                
+                // Make taskbar scrollable if too many apps
+                if (this.taskbarCenter.children.length > 5) {
+                    this.taskbarCenter.style.overflowX = 'auto';
                 }
             }
-            hideContextMenu();
-        };
-
-        // --- Logic: App Management (Simulated) ---
-        const openApp = (app) => {
-            // Since we don't have real app HTML content or iframes setup fully in this prompt scope,
-            // We will simulate opening it on the taskbar.
-            console.log("Opening app:", app.name);
             
-            // Add to running apps if not exists
-            if (!System.state.runningApps.includes(app.id)) {
-                System.state.runningApps.push(app.id);
-                renderTaskbarApps();
+            // Activate app in taskbar
+            activateTaskbarApp(appId) {
+                // Remove active class from all taskbar items
+                document.querySelectorAll('.taskbar-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+                
+                // Add active class to clicked app
+                const activeItem = document.querySelector(`.taskbar-item[data-app-id="${appId}"]`);
+                if (activeItem) {
+                    activeItem.classList.add('active');
+                }
             }
             
-            // In a real implementation, this would create an iframe or window div
-        };
-
-        const renderTaskbarApps = () => {
-            const container = $("taskbar-apps");
-            container.innerHTML = "";
+            // Show context menu
+            showContextMenu(e, app) {
+                e.preventDefault();
+                
+                // Position the context menu
+                this.contextMenu.style.left = `${e.clientX}px`;
+                this.contextMenu.style.top = `${e.clientY}px`;
+                this.contextMenu.classList.add('active');
+                this.contextMenu.dataset.appId = app.id;
+                
+                // Update pin button text
+                const pinButton = document.getElementById('contextPin');
+                pinButton.innerHTML = app.pinned ? 
+                    `<span class="material-symbols-rounded">push_pin</span><span>Unpin from Start</span>` :
+                    `<span class="material-symbols-rounded">push_pin</span><span>Pin to Start</span>`;
+                
+                // Close context menu when clicking elsewhere
+                const closeMenu = () => {
+                    this.contextMenu.classList.remove('active');
+                    document.removeEventListener('click', closeMenu);
+                };
+                
+                setTimeout(() => {
+                    document.addEventListener('click', closeMenu);
+                }, 10);
+            }
             
-            System.state.runningApps.forEach(appId => {
-                const app = System.state.apps.find(a => a.id === appId);
-                if (!app) return;
-
-                const btn = document.createElement("button");
-                btn.className = "h-10 w-10 flex items-center justify-center rounded hover:bg-white/10 relative group transition";
-                btn.innerHTML = `
-                    <span class="material-symbols-rounded text-xl text-white shadow-sm">${app.icon}</span>
-                    <div class="absolute bottom-1 w-1 h-1 bg-blue-400 rounded-full"></div>
-                `;
-                btn.onclick = () => alert(`Focusing ${app.name}... (App content not implemented in launcher-only build)`);
-                // Right click on taskbar item to close
-                btn.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    if(confirm("Close app?")) {
-                        System.state.runningApps = System.state.runningApps.filter(id => id !== appId);
-                        renderTaskbarApps();
+            // Save app to database
+            saveApp(app) {
+                if (!this.db) return;
+                
+                const transaction = this.db.transaction(['apps'], 'readwrite');
+                const store = transaction.objectStore('apps');
+                
+                if (app.id) {
+                    store.put(app);
+                } else {
+                    store.add(app);
+                }
+            }
+            
+            // Update time display
+            updateTime() {
+                const now = new Date();
+                
+                // Time formats
+                const time12hr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                const time24hr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                const date = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                const detailedDate = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                
+                // Update displays
+                document.getElementById('currentTime').textContent = time12hr;
+                document.getElementById('currentDate').textContent = date;
+                document.getElementById('detailedTime').textContent = time24hr;
+                document.getElementById('detailedDate').textContent = detailedDate;
+            }
+            
+            // Render notifications
+            renderNotifications() {
+                const notificationsList = document.getElementById('notificationsList');
+                notificationsList.innerHTML = '';
+                
+                if (this.notifications.length === 0) {
+                    notificationsList.innerHTML = `
+                        <div class="notification-item">
+                            <span class="material-symbols-rounded notification-icon">notifications_off</span>
+                            <div class="notification-content">
+                                <div class="notification-title">No notifications</div>
+                                <div class="notification-text">You're all caught up!</div>
+                            </div>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                this.notifications.slice().reverse().forEach(notification => {
+                    const notificationElement = document.createElement('div');
+                    notificationElement.className = `notification-item ${notification.read ? '' : 'unread'}`;
+                    
+                    // Calculate time ago
+                    const timeAgo = this.getTimeAgo(new Date(notification.time));
+                    
+                    notificationElement.innerHTML = `
+                        <span class="material-symbols-rounded notification-icon">notifications</span>
+                        <div class="notification-content">
+                            <div class="notification-title">${notification.title || 'Notification'}</div>
+                            <div class="notification-text">${notification.content || ''}</div>
+                            <div class="notification-time">${timeAgo}</div>
+                        </div>
+                    `;
+                    
+                    // Mark as read on click
+                    notificationElement.addEventListener('click', () => {
+                        this.markNotificationAsRead(notification.id);
+                    });
+                    
+                    notificationsList.appendChild(notificationElement);
+                });
+            }
+            
+            // Calculate time ago
+            getTimeAgo(date) {
+                const now = new Date();
+                const diffMs = now - date;
+                const diffSec = Math.floor(diffMs / 1000);
+                const diffMin = Math.floor(diffSec / 60);
+                const diffHour = Math.floor(diffMin / 60);
+                const diffDay = Math.floor(diffHour / 24);
+                
+                if (diffSec < 60) return 'Just now';
+                if (diffMin < 60) return `${diffMin} minute${diffMin > 1 ? 's' : ''} ago`;
+                if (diffHour < 24) return `${diffHour} hour${diffHour > 1 ? 's' : ''} ago`;
+                if (diffDay < 7) return `${diffDay} day${diffDay > 1 ? 's' : ''} ago`;
+                
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+            
+            // Mark notification as read
+            markNotificationAsRead(notificationId) {
+                if (!this.db) return;
+                
+                const transaction = this.db.transaction(['notifications'], 'readwrite');
+                const store = transaction.objectStore('notifications');
+                const request = store.get(notificationId);
+                
+                request.onsuccess = (event) => {
+                    const notification = event.target.result;
+                    if (notification) {
+                        notification.read = true;
+                        store.put(notification);
+                        this.loadNotifications();
                     }
                 };
-                container.appendChild(btn);
-            });
-        };
-
-        // --- Desktop Interactions ---
-        $("desktop").addEventListener("mousedown", (e) => {
-            if (e.target.id === "desktop" || e.target.id === "wallpaper") {
-                if (System.state.isStartOpen) toggleStartMenu();
-                if (System.state.isClockOpen) toggleClockPanel();
             }
-        });
-
-        document.addEventListener("click", () => {
-            hideContextMenu();
-        });
-
-        // Desktop Context Menu
-        $("desktop").addEventListener("contextmenu", (e) => {
-            if (e.target.id === "desktop" || e.target.id === "wallpaper") {
-                // We can show a desktop specific context menu (Properties, Wallpaper etc)
-                // For now, prompt implies app-specific context mainly, but we'll reuse generic or suppress default
-                e.preventDefault(); 
-            }
-        });
-
-
-        // --- Boot ---
-        window.onload = () => {
-            initDB().then(() => {
-                // Developer Note:
-                // Uncomment the line below to seed a test app if the DB is empty
-                // seedTestApp(); 
-            });
-            setInterval(updateClock, 1000);
-            updateClock();
-        };
-
-        // --- Debug/Seeding Helper (Optional) ---
-        function seedTestApp() {
-            const testApp = {
-                id: "settings-app",
-                name: "Settings",
-                icon: "settings",
-                url: "about:blank",
-                x: 20,
-                y: 20
-            };
-            dbOp("apps", "readwrite", store => store.put(testApp)).then(loadApps);
             
-            const testNotif = {
-                appName: "System",
-                context: "Welcome to Atlas OS!",
-                time: Date.now(),
-                read: false
-            };
-            dbOp("notifications", "readwrite", store => store.put(testNotif)).then(loadNotifications);
+            // Show system notification
+            showNotification(title, message, type = 'info') {
+                const notification = document.getElementById('systemNotification');
+                const icon = document.getElementById('notificationIcon');
+                const titleEl = document.getElementById('notificationTitle');
+                const messageEl = document.getElementById('notificationMessage');
+                
+                // Set notification content
+                titleEl.textContent = title;
+                messageEl.textContent = message;
+                
+                // Set icon based on type
+                const icons = {
+                    'info': 'info',
+                    'success': 'check_circle',
+                    'warning': 'warning',
+                    'error': 'error'
+                };
+                icon.textContent = icons[type] || 'info';
+                
+                // Show notification
+                notification.classList.add('show');
+                
+                // Auto-hide after 5 seconds
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                }, 5000);
+            }
+            
+            // Update empty state visibility
+            updateEmptyState() {
+                const emptyState = document.getElementById('emptyState');
+                const hasApps = this.apps.length > 0;
+                emptyState.style.display = hasApps ? 'none' : 'block';
+            }
+            
+            // Toggle startup panel
+            toggleStartupPanel() {
+                this.startupPanel.classList.toggle('active');
+                if (this.startupPanel.classList.contains('active')) {
+                    this.clockPanel.classList.remove('active');
+                }
+            }
+            
+            // Toggle clock panel
+            toggleClockPanel() {
+                this.clockPanel.classList.toggle('active');
+                if (this.clockPanel.classList.contains('active')) {
+                    this.startupPanel.classList.remove('active');
+                }
+            }
+            
+            // Setup event listeners
+            setupEventListeners() {
+                // Start button
+                document.getElementById('startButton').addEventListener('click', () => {
+                    this.toggleStartupPanel();
+                });
+                
+                // Time display (clock panel)
+                document.getElementById('timeDisplay').addEventListener('click', () => {
+                    this.toggleClockPanel();
+                });
+                
+                // Close panels when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!this.startupPanel.contains(e.target) && !document.getElementById('startButton').contains(e.target)) {
+                        this.startupPanel.classList.remove('active');
+                    }
+                    
+                    if (!this.clockPanel.contains(e.target) && !document.getElementById('timeDisplay').contains(e.target)) {
+                        this.clockPanel.classList.remove('active');
+                    }
+                });
+                
+                // Prevent default right-click on desktop
+                this.desktop.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    
+                    // Show desktop context menu (empty for now)
+                    this.contextMenu.style.left = `${e.clientX}px`;
+                    this.contextMenu.style.top = `${e.clientY}px`;
+                    this.contextMenu.classList.add('active');
+                    this.contextMenu.dataset.appId = '';
+                    
+                    // Update context menu for desktop (different options)
+                    document.getElementById('contextOpen').style.display = 'none';
+                    document.getElementById('contextPin').style.display = 'none';
+                    document.getElementById('contextCut').style.display = 'none';
+                    document.getElementById('contextCopy').style.display = 'none';
+                    document.getElementById('contextRemove').style.display = 'none';
+                    document.getElementById('contextDelete').style.display = 'none';
+                    
+                    const closeMenu = () => {
+                        this.contextMenu.classList.remove('active');
+                        document.removeEventListener('click', closeMenu);
+                    };
+                    
+                    setTimeout(() => {
+                        document.addEventListener('click', closeMenu);
+                    }, 10);
+                });
+                
+                // Context menu actions
+                document.getElementById('contextOpen').addEventListener('click', () => {
+                    const appId = parseInt(this.contextMenu.dataset.appId);
+                    const app = this.apps.find(a => a.id === appId);
+                    if (app) {
+                        this.openApp(app);
+                    }
+                    this.contextMenu.classList.remove('active');
+                });
+                
+                document.getElementById('contextPin').addEventListener('click', () => {
+                    const appId = parseInt(this.contextMenu.dataset.appId);
+                    const app = this.apps.find(a => a.id === appId);
+                    if (app) {
+                        app.pinned = !app.pinned;
+                        this.saveApp(app);
+                        this.renderStartupApps();
+                        this.showNotification(
+                            app.pinned ? 'App Pinned' : 'App Unpinned',
+                            `${app.name} has been ${app.pinned ? 'pinned to' : 'unpinned from'} Start`,
+                            'info'
+                        );
+                    }
+                    this.contextMenu.classList.remove('active');
+                });
+                
+                document.getElementById('contextRemove').addEventListener('click', () => {
+                    const appId = parseInt(this.contextMenu.dataset.appId);
+                    const app = this.apps.find(a => a.id === appId);
+                    if (app) {
+                        app.desktopVisible = false;
+                        this.saveApp(app);
+                        this.renderDesktopApps();
+                        this.showNotification(
+                            'App Removed',
+                            `${app.name} has been removed from desktop`,
+                            'info'
+                        );
+                    }
+                    this.contextMenu.classList.remove('active');
+                });
+                
+                // Power buttons
+                document.getElementById('shutdownButton').addEventListener('click', () => {
+                    if (confirm('Are you sure you want to shutdown Atlas OS?')) {
+                        this.showNotification('Shutting Down', 'Atlas OS is shutting down...', 'info');
+                        // In a real OS, this would trigger a shutdown
+                    }
+                });
+                
+                document.getElementById('restartButton').addEventListener('click', () => {
+                    if (confirm('Are you sure you want to restart Atlas OS?')) {
+                        this.showNotification('Restarting', 'Atlas OS is restarting...', 'info');
+                        // In a real OS, this would trigger a restart
+                    }
+                });
+                
+                // Notification buttons
+                document.getElementById('clearNotifications').addEventListener('click', () => {
+                    if (!this.db) return;
+                    
+                    const transaction = this.db.transaction(['notifications'], 'readwrite');
+                    const store = transaction.objectStore('notifications');
+                    const clearRequest = store.clear();
+                    
+                    clearRequest.onsuccess = () => {
+                        this.notifications = [];
+                        this.renderNotifications();
+                        this.showNotification('Notifications Cleared', 'All notifications have been cleared', 'info');
+                    };
+                });
+                
+                // App search
+                document.getElementById('appSearch').addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    const allApps = document.querySelectorAll('#allAppsList .taskbar-item');
+                    
+                    allApps.forEach(app => {
+                        const appName = app.textContent.toLowerCase();
+                        app.style.display = appName.includes(searchTerm) ? 'flex' : 'none';
+                    });
+                });
+                
+                // Add some sample apps for demonstration
+                this.addSampleApps();
+            }
+            
+            // Add sample apps for demonstration
+            addSampleApps() {
+                // Only add if no apps exist
+                if (this.apps.length > 0) return;
+                
+                const sampleApps = [
+                    { name: 'Settings', icon: 'settings', pinned: true, x: 20, y: 20, desktopVisible: true },
+                    { name: 'File Explorer', icon: 'folder', pinned: true, x: 120, y: 20, desktopVisible: true },
+                    { name: 'Browser', icon: 'public', pinned: false, x: 220, y: 20, desktopVisible: true },
+                    { name: 'Terminal', icon: 'terminal', pinned: false, x: 20, y: 130, desktopVisible: true },
+                    { name: 'Text Editor', icon: 'edit_document', pinned: false, x: 120, y: 130, desktopVisible: true },
+                    { name: 'Calculator', icon: 'calculate', pinned: true, x: 220, y: 130, desktopVisible: true },
+                    { name: 'Gallery', icon: 'photo_library', pinned: false, x: 20, y: 240, desktopVisible: true },
+                    { name: 'Music Player', icon: 'music_note', pinned: false, x: 120, y: 240, desktopVisible: true }
+                ];
+                
+                // Add to database
+                sampleApps.forEach(app => {
+                    this.saveApp(app);
+                });
+                
+                // Reload apps
+                setTimeout(() => this.loadApps(), 100);
+            }
         }
-
+        
+        // Initialize Atlas Launcher when page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            window.atlasLauncher = new AtlasLauncher();
+        });
     </script>
 </body>
 </html>
