@@ -73,7 +73,6 @@
             box-shadow: inset 0 0 0 2px var(--primary-color) !important;
         }
 
-        /* Active Day Effect */
         .active-day-glow {
             background: linear-gradient(to bottom right, #ffffff, #f0f7ff);
             box-shadow: inset 0 0 15px rgba(37, 99, 235, 0.1);
@@ -139,7 +138,6 @@
 <body class="flex flex-col h-screen overflow-hidden">
 
     <div class="flex flex-row h-full w-full gap-0 overflow-hidden">
-        
         <div class="flex-grow flex flex-col h-full bg-white">
             <header class="px-6 py-4 flex items-center justify-between border-b border-slate-100">
                 <div class="flex items-center gap-6">
@@ -173,12 +171,9 @@
 
         <aside id="sidebar-timeline" class="w-80 lg:w-96 flex flex-col border-l border-slate-100 bg-white">
             <div class="flex-grow flex flex-col p-6 overflow-hidden">
-                <!-- Today's Special Card -->
                 <div id="today-agenda-container" class="mb-8 hidden">
                     <h2 class="text-xs font-bold text-brand-primary uppercase tracking-widest mb-3">Today's Agenda</h2>
-                    <div id="today-agenda-card" class="bg-brand-primary rounded-2xl p-4 shadow-lg shadow-blue-100 text-white">
-                        <!-- Today's items -->
-                    </div>
+                    <div id="today-agenda-card" class="bg-brand-primary rounded-2xl p-4 shadow-lg shadow-blue-100 text-white"></div>
                 </div>
 
                 <div class="flex items-center justify-between mb-4">
@@ -268,16 +263,13 @@
             monthDisplay.textContent = new Date(viewYear, viewMonth).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
             for (let i = 0; i < firstDay; i++) {
-                const day = prevDaysInMonth - firstDay + i + 1;
-                createCell(day, 'disabled', formatDate(new Date(viewYear, viewMonth - 1, day)));
+                createCell(prevDaysInMonth - firstDay + i + 1, 'disabled', formatDate(new Date(viewYear, viewMonth - 1, prevDaysInMonth - firstDay + i + 1)));
             }
 
             for (let i = 1; i <= daysInMonth; i++) {
                 const dateStr = formatDate(new Date(viewYear, viewMonth, i));
                 const dayOfWeek = new Date(viewYear, viewMonth, i).getDay();
-                const isWeekend = dayOfWeek === 5 || dayOfWeek === 6;
-                const hasEventsToday = (dateStr === todayStr && events[dateStr]);
-                createCell(i, isWeekend ? 'weekend' : '', dateStr, true, hasEventsToday);
+                createCell(i, (dayOfWeek === 5 || dayOfWeek === 6) ? 'weekend' : '', dateStr, true, (dateStr === todayStr && events[dateStr]));
             }
 
             const remaining = 42 - (firstDay + daysInMonth);
@@ -292,9 +284,7 @@
             if (hasSpecialEffect) cell.classList.add('active-day-glow');
             cell.dataset.date = dateStr;
 
-            if (dateStr === formatDate(new Date()) && status !== 'disabled') {
-                cell.classList.add('today-cell');
-            }
+            if (dateStr === formatDate(new Date()) && status !== 'disabled') cell.classList.add('today-cell');
 
             const header = document.createElement('div');
             header.className = `text-xs font-mono font-bold ${status === 'weekend' ? 'weekend-text' : ''}`;
@@ -313,10 +303,7 @@
                 cell.appendChild(container);
             }
 
-            if (isClickable) {
-                cell.onclick = () => openModal(dateStr);
-            }
-
+            if (isClickable) cell.onclick = () => openModal(dateStr);
             calendarBody.appendChild(cell);
         }
 
@@ -330,34 +317,21 @@
                 evs.forEach(e => all.push({ ...e, date }));
             });
 
-            // Filter for Today specifically for the Agenda Card
-            const todayItems = all.filter(item => item.date === todayStr)
-                                 .sort((a, b) => a.time.localeCompare(b.time));
+            const todayItems = all.filter(item => item.date === todayStr).sort((a, b) => a.time.localeCompare(b.time));
 
             if (todayItems.length > 0) {
                 todayAgendaContainer.classList.remove('hidden');
                 todayItems.forEach(item => {
                     const div = document.createElement('div');
                     div.className = 'flex items-center justify-between py-2 border-b border-white/20 last:border-0';
-                    div.innerHTML = `
-                        <div class="overflow-hidden">
-                            <p class="font-bold text-sm truncate">${item.title}</p>
-                            <p class="text-[10px] font-mono opacity-80">${item.time}</p>
-                        </div>
-                        <div class="bg-white/20 p-1.5 rounded-lg">
-                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"></path></svg>
-                        </div>
-                    `;
+                    div.innerHTML = `<div class="overflow-hidden"><p class="font-bold text-sm truncate">${item.title}</p><p class="text-[10px] font-mono opacity-80">${item.time}</p></div><div class="bg-white/20 p-1.5 rounded-lg"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"></path></svg></div>`;
                     todayAgendaCard.appendChild(div);
                 });
             } else {
                 todayAgendaContainer.classList.add('hidden');
             }
 
-            // General Timeline (Today onwards)
-            const futureItems = all.filter(item => item.date >= todayStr)
-                                   .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
-
+            const futureItems = all.filter(item => item.date >= todayStr).sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
             document.getElementById('event-count').textContent = `${futureItems.length} EVENTS`;
 
             if (futureItems.length === 0) {
@@ -366,23 +340,11 @@
             }
 
             futureItems.slice(0, 15).forEach(item => {
+                const d = new Date(item.date);
                 const card = document.createElement('div');
                 card.className = 'group p-3 hover:bg-slate-50 rounded-xl transition-all cursor-pointer flex gap-3 items-center';
                 card.onclick = () => jumpToDate(item.date);
-                
-                const d = new Date(item.date);
-                const isWeekend = d.getDay() === 5 || d.getDay() === 6;
-
-                card.innerHTML = `
-                    <div class="flex flex-col items-center justify-center min-w-[36px] h-10 rounded-lg ${isWeekend ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-600'} font-bold">
-                        <span class="text-[8px] uppercase">${d.toLocaleString('en-US', { month: 'short' })}</span>
-                        <span class="text-sm leading-tight">${d.getDate()}</span>
-                    </div>
-                    <div class="flex-grow overflow-hidden">
-                        <h4 class="font-bold text-xs text-slate-800 truncate">${item.title}</h4>
-                        <p class="text-[10px] text-slate-400 font-mono">${item.time}</p>
-                    </div>
-                `;
+                card.innerHTML = `<div class="flex flex-col items-center justify-center min-w-[36px] h-10 rounded-lg ${(d.getDay() === 5 || d.getDay() === 6) ? 'bg-rose-50 text-rose-500' : 'bg-slate-100 text-slate-600'} font-bold"><span class="text-[8px] uppercase">${d.toLocaleString('en-US', { month: 'short' })}</span><span class="text-sm leading-tight">${d.getDate()}</span></div><div class="flex-grow overflow-hidden"><h4 class="font-bold text-xs text-slate-800 truncate">${item.title}</h4><p class="text-[10px] text-slate-400 font-mono">${item.time}</p></div>`;
                 upcomingEventsList.appendChild(card);
             });
         }
@@ -392,38 +354,44 @@
             
             const now = new Date();
             const todayStr = formatDate(now);
-            const todayEvents = (events[todayStr] || [])
-                .sort((a, b) => a.time.localeCompare(b.time));
+            
+            // Get today's events, but filter out those that have already passed
+            const upcomingToday = (events[todayStr] || []).filter(item => {
+                const [h, m] = item.time.split(':').map(Number);
+                const evTime = new Date();
+                evTime.setHours(h, m, 0, 0);
+                return evTime > now;
+            }).sort((a, b) => a.time.localeCompare(b.time));
 
-            if (todayEvents.length === 0) {
+            if (upcomingToday.length === 0) {
                 window.location.hash = "";
                 return;
             }
 
-            let index = 0;
+            let loopCount = 0;
             const updateHash = () => {
-                const item = todayEvents[index];
-                const [h, m] = item.time.split(':').map(Number);
-                const eventDate = new Date();
-                eventDate.setHours(h, m, 0, 0);
+                if (loopCount >= upcomingToday.length) {
+                    clearInterval(notificationInterval);
+                    return;
+                }
 
-                const diffMs = eventDate - new Date();
+                const item = upcomingToday[loopCount];
+                const [h, m] = item.time.split(':').map(Number);
+                const evTime = new Date();
+                evTime.setHours(h, m, 0, 0);
+
+                const diffMs = evTime - new Date();
                 let timeStr = "";
 
                 if (diffMs < 0) {
-                    timeStr = "past due";
+                    timeStr = "starting now";
                 } else {
-                    const diffMins = Math.floor(diffMs / 60000);
-                    if (diffMins < 1) {
-                        timeStr = `${Math.floor(diffMs / 1000)} seconds`;
-                    } else {
-                        timeStr = `${diffMins} minutes`;
-                    }
+                    const mins = Math.floor(diffMs / 60000);
+                    timeStr = (mins < 1) ? `${Math.floor(diffMs / 1000)} seconds` : `${mins} minutes`;
                 }
 
                 window.location.hash = `notification=You have an event "${item.title}" in ${timeStr}`;
-                
-                index = (index + 1) % todayEvents.length;
+                loopCount++;
             };
 
             updateHash();
@@ -432,10 +400,8 @@
 
         function jumpToDate(dateStr) {
             const [y, m, d] = dateStr.split('-').map(Number);
-            viewYear = y;
-            viewMonth = m - 1;
+            viewYear = y; viewMonth = m - 1;
             renderCalendar();
-            
             setTimeout(() => {
                 const cell = document.querySelector(`[data-date="${dateStr}"]`);
                 if (cell) {
@@ -447,8 +413,7 @@
 
         function openModal(dateStr) {
             selectedDateString = dateStr;
-            const d = new Date(dateStr);
-            modalTitle.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            modalTitle.textContent = new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
             renderModalEvents();
             eventModal.classList.remove('hidden');
         }
@@ -456,27 +421,14 @@
         function renderModalEvents() {
             modalEventList.innerHTML = '';
             const dayEvents = events[selectedDateString] || [];
-            
             if (dayEvents.length === 0) {
                 modalEventList.innerHTML = '<p class="text-center text-slate-300 py-4 text-xs">Clear schedule</p>';
                 return;
             }
-
             dayEvents.sort((a, b) => a.time.localeCompare(b.time)).forEach(ev => {
                 const div = document.createElement('div');
                 div.className = 'flex items-center justify-between p-3 bg-slate-50 rounded-xl group';
-                div.innerHTML = `
-                    <div class="flex items-center gap-2 overflow-hidden">
-                        <div class="min-w-[4px] h-4 rounded-full bg-brand-primary"></div>
-                        <div class="overflow-hidden">
-                            <p class="font-bold text-slate-700 text-xs truncate">${ev.title}</p>
-                            <p class="text-[9px] text-slate-400 font-mono">${ev.time}</p>
-                        </div>
-                    </div>
-                    <button onclick="deleteEvent('${ev.id}')" class="p-1 text-slate-300 hover:text-rose-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
-                `;
+                div.innerHTML = `<div class="flex items-center gap-2 overflow-hidden"><div class="min-w-[4px] h-4 rounded-full bg-brand-primary"></div><div class="overflow-hidden"><p class="font-bold text-slate-700 text-xs truncate">${ev.title}</p><p class="text-[9px] text-slate-400 font-mono">${ev.time}</p></div></div><button onclick="deleteEvent('${ev.id}')" class="p-1 text-slate-300 hover:text-rose-500"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
                 modalEventList.appendChild(div);
             });
         }
