@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atlas OS Beta 1</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow: hidden; user-select: none; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .glass-dark {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Desktop Wallpaper Default */
+        #desktop {
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            transition: background-image 0.5s ease;
+        }
+
+        /* Window Styling */
+        .os-window {
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            transition: transform 0.1s, opacity 0.2s, width 0.1s, height 0.1s;
+        }
+        .os-window.dragging { user-select: none; transition: none; }
+        .os-window.minimized { opacity: 0; pointer-events: none; transform: scale(0.8) translateY(200px); }
+        .os-window.maximized { top: 0 !important; left: 0 !important; width: 100% !important; height: calc(100% - 48px) !important; border-radius: 0; }
+        
+        /* Iframe overlay to prevent mouse trapping during drag */
+        .iframe-shield { display: none; position: absolute; inset: 0; z-index: 50; }
+        .os-window.dragging .iframe-shield { display: block; }
+
+        /* Animations */
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
+        .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .toast-enter { animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        /* Taskbar Items */
+        .taskbar-item:hover { background-color: rgba(0,0,0,0.05); }
+        .taskbar-item.active { background-color: rgba(0,0,0,0.1); border-bottom: 3px solid #3b82f6; }
+    </style>
+</head>
+<body class="h-screen w-screen overflow-hidden bg-gray-100 text-gray-800">
+
+    <!-- Desktop Area -->
+    <div id="desktop" class="absolute inset-0 pb-12 z-0" style="background-image: url('https://images.unsplash.com/photo-1493246507139-91e8fad9978e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80');">
+        <!-- Desktop Icons Grid -->
+        <div id="desktop-icons" class="p-4 grid grid-cols-1 gap-4 w-24">
+            <!-- Icons injected by JS -->
+        </div>
+
+        <!-- Windows Area -->
+        <div id="windows-container"></div>
+    </div>
+
+    <!-- Start Menu (App Drawer) -->
+    <div id="start-menu" class="hidden absolute bottom-14 left-2 w-80 h-[500px] glass-dark rounded-xl shadow-2xl flex flex-col overflow-hidden z-50 animate-slide-up">
+        <div class="p-4 border-b border-gray-200">
+            <div class="relative">
+                <span class="material-symbols-outlined absolute left-2 top-2 text-gray-400">search</span>
+                <input type="text" id="app-search" placeholder="Search apps..." class="w-full bg-gray-100 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+            </div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4">
+            <h3 class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Pinned</h3>
+            <div id="pinned-apps-grid" class="grid grid-cols-4 gap-4 mb-6">
+                <!-- Pinned apps injected JS -->
+            </div>
+            
+            <h3 class="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">All Apps</h3>
+            <div id="all-apps-list" class="space-y-1">
+                <!-- All apps list injected JS -->
+            </div>
+        </div>
+        <div class="p-3 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">U</div>
+                <span class="text-sm font-medium">User</span>
+            </div>
+            <button onclick="System.openSettings()" class="p-2 hover:bg-gray-200 rounded-full transition-colors" title="Settings">
+                <span class="material-symbols-outlined text-[20px]">settings</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Notification & Time Panel -->
+    <div id="notification-panel" class="hidden absolute bottom-14 right-2 w-80 h-[400px] glass-dark rounded-xl shadow-2xl flex flex-col z-50 animate-slide-up">
+        <div class="p-4 border-b border-gray-200 bg-white/50">
+            <div id="panel-date" class="text-sm font-medium text-gray-500 uppercase tracking-wide"></div>
+            <div id="panel-clock" class="text-3xl font-light text-gray-800"></div>
+        </div>
+        <div class="flex-1 overflow-y-auto p-2" id="notification-list">
+            <div id="no-notifs-msg" class="h-full flex flex-col items-center justify-center text-gray-400">
+                <span class="material-symbols-outlined text-4xl mb-2">notifications_off</span>
+                <span class="text-sm">No notifications</span>
+            </div>
+        </div>
+        <div class="p-2 border-t border-gray-200 flex justify-end">
+            <button onclick="Notifications.clearAll()" class="text-xs text-blue-600 hover:text-blue-800 font-medium px-3 py-1 hover:bg-blue-50 rounded">
+                Clear all
+            </button>
+        </div>
+    </div>
+
+    <!-- Taskbar -->
+    <div id="taskbar" class="absolute bottom-0 w-full h-12 glass flex items-center justify-between px-2 z-50">
+        <div class="flex items-center h-full gap-2">
+            <!-- Start Button -->
+            <button onclick="UI.toggleStartMenu()" class="h-10 w-10 flex items-center justify-center rounded hover:bg-white/50 transition-colors active:scale-95">
+                <span class="material-symbols-outlined text-blue-600 text-[28px]">grid_view</span>
+            </button>
+            
+            <!-- App Dock / Running Apps -->
+            <div id="taskbar-apps" class="flex items-center gap-1 h-full overflow-x-auto px-2 max-w-[calc(100vw-300px)]">
+                <!-- Apps injected here -->
+            </div>
+        </div>
+
+        <!-- System Tray -->
+        <div class="flex items-center h-full gap-2">
+            <button onclick="UI.toggleNotificationPanel()" class="h-full px-3 hover:bg-white/50 rounded flex flex-col justify-center items-end min-w-[80px] transition-colors">
+                <div id="taskbar-clock" class="text-sm font-medium leading-none">12:00</div>
+                <div id="taskbar-date" class="text-[10px] text-gray-500 leading-none mt-1">10/24/2023</div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="absolute bottom-16 right-4 z-[60] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Settings Modal (Baked In) -->
+    <div id="settings-window" class="hidden absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-white rounded-lg shadow-2xl z-[100] flex flex-col overflow-hidden border border-gray-200">
+        <div class="h-10 bg-gray-50 border-b border-gray-200 flex justify-between items-center px-4 draggable-header cursor-move">
+            <span class="text-sm font-medium flex items-center gap-2">
+                <span class="material-symbols-outlined text-gray-500 text-[18px]">settings</span> Settings
+            </span>
+            <button onclick="document.getElementById('settings-window').classList.add('hidden')" class="hover:bg-red-500 hover:text-white rounded p-1">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+        </div>
+        <div class="flex flex-1 overflow-hidden">
+            <!-- Sidebar -->
+            <div class="w-48 bg-gray-50 border-r border-gray-200 p-2 flex flex-col gap-1">
+                <button onclick="Settings.switchTab('personalization')" class="settings-tab-btn active text-left px-3 py-2 rounded text-sm font-medium hover:bg-gray-200 bg-blue-100 text-blue-700">Personalization</button>
+                <button onclick="Settings.switchTab('apps')" class="settings-tab-btn text-left px-3 py-2 rounded text-sm font-medium hover:bg-gray-200 text-gray-700">Apps & Startup</button>
+                <button onclick="Settings.switchTab('install')" class="settings-tab-btn text-left px-3 py-2 rounded text-sm font-medium hover:bg-gray-200 text-gray-700">Install App</button>
+                <button onclick="Settings.switchTab('about')" class="settings-tab-btn text-left px-3 py-2 rounded text-sm font-medium hover:bg-gray-200 text-gray-700">About Atlas</button>
+            </div>
+            <!-- Content -->
+            <div class="flex-1 p-6 overflow-y-auto">
+                
+                <!-- Personalization Tab -->
+                <div id="tab-personalization" class="settings-content">
+                    <h2 class="text-xl font-bold mb-4">Wallpaper</h2>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div onclick="Settings.setWallpaper('https://images.unsplash.com/photo-1493246507139-91e8fad9978e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')" class="aspect-video bg-gray-200 rounded cursor-pointer border-2 border-transparent hover:border-blue-500 bg-cover" style="background-image: url('https://images.unsplash.com/photo-1493246507139-91e8fad9978e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=60')"></div>
+                        <div onclick="Settings.setWallpaper('https://images.unsplash.com/photo-1477346611705-65d1883cee1e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')" class="aspect-video bg-gray-200 rounded cursor-pointer border-2 border-transparent hover:border-blue-500 bg-cover" style="background-image: url('https://images.unsplash.com/photo-1477346611705-65d1883cee1e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=60')"></div>
+                        <div onclick="Settings.setWallpaper('https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')" class="aspect-video bg-gray-200 rounded cursor-pointer border-2 border-transparent hover:border-blue-500 bg-cover" style="background-image: url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=60')"></div>
+                        <div onclick="Settings.setWallpaper('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80')" class="aspect-video bg-gray-200 rounded cursor-pointer border-2 border-transparent hover:border-blue-500 bg-cover" style="background-image: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=200&q=60')"></div>
+                    </div>
+                </div>
+
+                <!-- Apps Tab -->
+                <div id="tab-apps" class="settings-content hidden">
+                    <h2 class="text-xl font-bold mb-4">Startup Apps</h2>
+                    <p class="text-sm text-gray-500 mb-4">These apps open secretly in the background when Atlas starts.</p>
+                    <div id="startup-list" class="space-y-2"></div>
+
+                    <h2 class="text-xl font-bold mt-8 mb-4">Block Notifications</h2>
+                    <div id="block-notif-list" class="space-y-2"></div>
+                </div>
+
+                <!-- Install Tab -->
+                <div id="tab-install" class="settings-content hidden">
+                    <h2 class="text-xl font-bold mb-4">Install App</h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">App Name</label>
+                            <input type="text" id="install-name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Icon (Material Symbol Name)</label>
+                            <input type="text" id="install-icon" placeholder="e.g., star" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                            <a href="https://fonts.google.com/icons" target="_blank" class="text-xs text-blue-500">Find icons</a>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">App URL</label>
+                            <input type="text" id="install-url" placeholder="https://..." class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2">
+                        </div>
+                        <button onclick="Settings.installApp()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Install</button>
+                    </div>
+                </div>
+
+                <!-- About Tab -->
+                <div id="tab-about" class="settings-content hidden">
+                    <div class="flex flex-col items-center justify-center pt-8">
+                        <div class="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg">
+                            <span class="material-symbols-outlined text-[48px]">public</span>
+                        </div>
+                        <h1 class="text-2xl font-bold">Atlas OS</h1>
+                        <p class="text-gray-500">Version 1.0 Beta</p>
+                        <p class="mt-8 text-center text-sm text-gray-600 max-w-sm">
+                            A lightweight web-based operating system. <br>
+                            Created for demonstration purposes.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Javascript Logic -->
+    <script>
+        // --- State Management ---
+        const State = {
+            apps: JSON.parse(localStorage.getItem('atlas_apps')) || [
+                { id: 'settings', name: 'Settings', icon: 'settings', url: 'internal://settings', system: true, pinned: true },
+                { id: 'calc', name: 'Calculator', icon: 'calculate', url: 'https://mahi902.github.io/Atlas/calculator.html', pinned: true },
+                { id: 'clock', name: 'Clock', icon: 'schedule', url: 'https://mahi902.github.io/Atlas/clock.html', pinned: true },
+                { id: 'notes', name: 'Notes', icon: 'description', url: 'https://mahi902.github.io/Atlas/notes.html', pinned: true },
+                { id: 'draw', name: 'Draw', icon: 'brush', url: 'https://mahi902.github.io/Atlas/draw.html', pinned: true }
+            ],
+            settings: JSON.parse(localStorage.getItem('atlas_settings')) || {
+                wallpaper: 'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80',
+                autoStart: ['clock'], // App IDs
+                blockedNotifications: []
+            },
+            windows: [], // { id, appId, zIndex, state: 'normal'|'min'|'max' }
+            activeWindowId: null,
+            zIndexCounter: 100,
+            notifications: []
+        };
+
+        // --- Core OS Logic ---
+        const OS = {
+            init: () => {
+                UI.renderDesktopIcons();
+                UI.renderStartMenu();
+                UI.updateClock();
+                OS.applyWallpaper(State.settings.wallpaper);
+                
+                setInterval(UI.updateClock, 1000);
+                
+                // Auto start apps
+                State.settings.autoStart.forEach(appId => {
+                    const app = State.apps.find(a => a.id === appId);
+                    if(app) WindowManager.open(appId, true); // true = silent/background
+                });
+
+                // Notification Poller
+                setInterval(Notifications.poll, 500);
+            },
+
+            applyWallpaper: (url) => {
+                document.getElementById('desktop').style.backgroundImage = `url('${url}')`;
+                State.settings.wallpaper = url;
+                OS.saveSettings();
+            },
+
+            saveApps: () => {
+                localStorage.setItem('atlas_apps', JSON.stringify(State.apps));
+            },
+
+            saveSettings: () => {
+                localStorage.setItem('atlas_settings', JSON.stringify(State.settings));
+            }
+        };
+
+        // --- Window Manager ---
+        const WindowManager = {
+            open: (appId, hidden = false) => {
+                const app = State.apps.find(a => a.id === appId);
+                if (!app) return;
+
+                // If internal settings app
+                if (app.url === 'internal://settings') {
+                    if (hidden) return; // Settings can't be background
+                    document.getElementById('settings-window').classList.remove('hidden');
+                    Settings.renderLists();
+                    return;
+                }
+
+                // Check if already open
+                const existing = State.windows.find(w => w.appId === appId);
+                if (existing) {
+                    if (hidden) return;
+                    WindowManager.focus(existing.id);
+                    if(existing.state === 'min') WindowManager.restore(existing.id);
+                    return;
+                }
+
+                const winId = 'win_' + Date.now();
+                const zIndex = ++State.zIndexCounter;
+
+                // Create Window HTML
+                const winEl = document.createElement('div');
+                winEl.id = winId;
+                winEl.className = `os-window absolute bg-white rounded-lg flex flex-col overflow-hidden border border-gray-300`;
+                winEl.style.width = '600px';
+                winEl.style.height = '400px';
+                winEl.style.zIndex = zIndex;
+                winEl.style.left = (50 + (State.windows.length * 20)) + 'px';
+                winEl.style.top = (50 + (State.windows.length * 20)) + 'px';
+                
+                // If hidden (auto-start), push off screen
+                if(hidden) {
+                    winEl.style.visibility = 'hidden';
+                    winEl.style.pointerEvents = 'none';
+                    // We still mount it to DOM so code runs, but hide it
+                }
+
+                winEl.innerHTML = `
+                    <div class="h-8 bg-gray-100 border-b border-gray-200 flex justify-between items-center px-2 select-none" onmousedown="WindowManager.startDrag(event, '${winId}')">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[16px] text-gray-600">${app.icon}</span>
+                            <span class="text-xs font-medium text-gray-700">${app.name}</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="WindowManager.minimize('${winId}')" class="p-1 hover:bg-gray-200 rounded"><div class="w-2 h-0.5 bg-gray-600"></div></button>
+                            <button onclick="WindowManager.toggleMaximize('${winId}')" class="p-1 hover:bg-gray-200 rounded"><div class="w-2 h-2 border border-gray-600"></div></button>
+                            <button onclick="WindowManager.close('${winId}')" class="p-1 hover:bg-red-500 hover:text-white rounded text-gray-600"><span class="material-symbols-outlined text-[14px]">close</span></button>
+                        </div>
+                    </div>
+                    <div class="relative flex-1 bg-white">
+                        <div class="iframe-shield"></div>
+                        <iframe id="iframe_${winId}" src="${app.url}" class="w-full h-full border-0"></iframe>
+                    </div>
+                    <div class="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50" onmousedown="WindowManager.startResize(event, '${winId}')"></div>
+                `;
+
+                winEl.addEventListener('mousedown', () => WindowManager.focus(winId));
+                document.getElementById('windows-container').appendChild(winEl);
+
+                State.windows.push({ id: winId, appId: appId, state: hidden ? 'background' : 'normal' });
+                if(!hidden) WindowManager.focus(winId);
+                UI.renderTaskbar();
+            },
+
+            close: (winId) => {
+                const win = document.getElementById(winId);
+                if (win) win.remove();
+                State.windows = State.windows.filter(w => w.id !== winId);
+                UI.renderTaskbar();
+            },
+
+            minimize: (winId) => {
+                const win = document.getElementById(winId);
+                const winObj = State.windows.find(w => w.id === winId);
+                if (win && winObj) {
+                    win.classList.add('minimized');
+                    winObj.state = 'min';
+                }
+            },
+
+            restore: (winId) => {
+                const win = document.getElementById(winId);
+                const winObj = State.windows.find(w => w.id === winId);
+                if (win && winObj) {
+                    win.classList.remove('minimized');
+                    winObj.state = 'normal';
+                    WindowManager.focus(winId);
+                }
+            },
+
+            toggleMaximize: (winId) => {
+                const win = document.getElementById(winId);
+                if (win.classList.contains('maximized')) {
+                    win.classList.remove('maximized');
+                } else {
+                    win.classList.add('maximized');
+                }
+            },
+
+            focus: (winId) => {
+                const win = document.getElementById(winId);
+                if(win) {
+                    win.style.zIndex = ++State.zIndexCounter;
+                    State.activeWindowId = winId;
+                    
+                    // Highlight taskbar
+                    document.querySelectorAll('.taskbar-item').forEach(el => el.classList.remove('active'));
+                    const appObj = State.windows.find(w => w.id === winId);
+                    if(appObj) {
+                        const taskbarEl = document.getElementById(`tb-item-${appObj.appId}`);
+                        if(taskbarEl) taskbarEl.classList.add('active');
+                    }
+                }
+            },
+
+            // Dragging Logic
+            startDrag: (e, winId) => {
+                if (e.target.closest('button')) return; // Don't drag if clicking buttons
+                const win = document.getElementById(winId);
+                if(win.classList.contains('maximized')) return;
+
+                win.classList.add('dragging');
+                WindowManager.focus(winId);
+
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const rect = win.getBoundingClientRect();
+                const offsetX = startX - rect.left;
+                const offsetY = startY - rect.top;
+
+                const onMouseMove = (ev) => {
+                    win.style.left = (ev.clientX - offsetX) + 'px';
+                    win.style.top = (ev.clientY - offsetY) + 'px';
+                };
+
+                const onMouseUp = () => {
+                    win.classList.remove('dragging');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            },
+
+            startResize: (e, winId) => {
+                e.preventDefault();
+                const win = document.getElementById(winId);
+                win.classList.add('dragging'); // Enables iframe shield
+                
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startW = parseInt(document.defaultView.getComputedStyle(win).width, 10);
+                const startH = parseInt(document.defaultView.getComputedStyle(win).height, 10);
+
+                const onMouseMove = (ev) => {
+                    win.style.width = (startW + ev.clientX - startX) + 'px';
+                    win.style.height = (startH + ev.clientY - startY) + 'px';
+                };
+
+                const onMouseUp = () => {
+                    win.classList.remove('dragging');
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            }
+        };
+
+        // --- Notification System ---
+        const Notifications = {
+            poll: () => {
+                // Check every open window iframe for hash changes
+                State.windows.forEach(winObj => {
+                    // Skip if blocked
+                    if(State.settings.blockedNotifications.includes(winObj.appId)) return;
+
+                    const iframe = document.getElementById(`iframe_${winObj.id}`);
+                    if(!iframe) return;
+
+                    try {
+                        // NOTE: This will fail for cross-origin domains due to security policies.
+                        // However, it works if the iframes are same-origin or loaded via data URIs.
+                        // For the purpose of this simulation with external GitHub pages, 
+                        // browser will likely block this access with a SecurityError.
+                        // In a real OS scenario, apps would use window.parent.postMessage().
+                        
+                        const href = iframe.contentWindow.location.href;
+                        
+                        if (href.includes('#notification=')) {
+                            // Extract message
+                            const urlObj = new URL(href);
+                            const hash = urlObj.hash; // #notification=Hello%20World
+                            const message = decodeURIComponent(hash.replace('#notification=', ''));
+
+                            // Clear the hash to prevent loop (if we can write to it)
+                            // If we can't write, we store the last notified timestamp to debounce
+                            try {
+                                iframe.contentWindow.history.replaceState(null, null, ' ');
+                            } catch(e) { /* ignore write error */ }
+
+                            // Trigger Notification
+                            const app = State.apps.find(a => a.id === winObj.appId);
+                            Notifications.add(app, message);
+                        }
+                    } catch (e) {
+                        // SOP Error expected here for external domains
+                        // console.log("SOP blocked iframe access - standard browser behavior");
+                    }
+                });
+            },
+
+            add: (app, message) => {
+                const notif = {
+                    id: Date.now(),
+                    appId: app.id,
+                    appName: app.name,
+                    icon: app.icon,
+                    message: message,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                };
+
+                State.notifications.unshift(notif);
+                
+                // Show Toast
+                Notifications.showToast(notif);
+                
+                // Update Panel
+                UI.renderNotifications();
+            },
+
+            showToast: (notif) => {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `toast-enter pointer-events-auto bg-white/90 backdrop-blur border border-gray-200 shadow-lg rounded-lg p-3 w-72 flex gap-3`;
+                toast.innerHTML = `
+                    <div class="mt-1"><span class="material-symbols-outlined text-blue-500">${notif.icon}</span></div>
+                    <div class="flex-1">
+                        <h4 class="text-sm font-semibold text-gray-800">${notif.appName}</h4>
+                        <p class="text-xs text-gray-600 line-clamp-2">${notif.message}</p>
+                    </div>
+                `;
+                
+                container.appendChild(toast);
+
+                // Slide out after 2 seconds (plus animation time)
+                setTimeout(() => {
+                    toast.style.transition = 'opacity 0.5s, transform 0.5s';
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(100%)';
+                    setTimeout(() => toast.remove(), 500);
+                }, 3000);
+            },
+
+            clearAll: () => {
+                State.notifications = [];
+                UI.renderNotifications();
+            }
+        };
+
+        // --- UI Rendering ---
+        const UI = {
+            renderDesktopIcons: () => {
+                const container = document.getElementById('desktop-icons');
+                container.innerHTML = '';
+                
+                State.apps.forEach(app => {
+                    // Logic for "unpin from desktop" could remove them from a 'desktopApps' list
+                    // For now we render all except system
+                    // if(app.system) return; 
+
+                    const el = document.createElement('div');
+                    el.className = 'flex flex-col items-center gap-1 group cursor-pointer p-2 rounded hover:bg-white/20 transition-colors w-20';
+                    el.onclick = () => WindowManager.open(app.id);
+                    el.draggable = true;
+                    // Simple drag visual (no logic to move position indefinitely in this beta)
+                    
+                    el.innerHTML = `
+                        <div class="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform text-blue-500">
+                            <span class="material-symbols-outlined text-[28px]">${app.icon}</span>
+                        </div>
+                        <span class="text-xs text-white font-medium shadow-black drop-shadow-md text-center leading-tight">${app.name}</span>
+                    `;
+                    container.appendChild(el);
+                });
+            },
+
+            renderTaskbar: () => {
+                const container = document.getElementById('taskbar-apps');
+                container.innerHTML = '';
+
+                // Get unique active apps (excluding background/hidden ones if preferred, but prompt says "When an app is open, it shows")
+                // We map running windows to taskbar items
+                const visibleWindows = State.windows.filter(w => w.state !== 'background');
+                // De-duplicate by App ID if we want grouped icons, but standard is per window or per app. 
+                // Let's do per App ID for cleanliness.
+                const uniqueAppIds = [...new Set(visibleWindows.map(w => w.appId))];
+
+                uniqueAppIds.forEach(appId => {
+                    const app = State.apps.find(a => a.id === appId);
+                    const isActive = State.activeWindowId && State.windows.find(w => w.id === State.activeWindowId)?.appId === appId;
+                    
+                    const el = document.createElement('div');
+                    el.id = `tb-item-${appId}`;
+                    el.className = `taskbar-item h-10 w-10 flex items-center justify-center rounded cursor-pointer transition-all ${isActive ? 'active' : ''}`;
+                    el.onclick = () => {
+                        const win = State.windows.find(w => w.appId === appId && w.state !== 'background');
+                        if(win) {
+                            if(win.state === 'min') WindowManager.restore(win.id);
+                            else if(State.activeWindowId === win.id) WindowManager.minimize(win.id);
+                            else WindowManager.focus(win.id);
+                        }
+                    };
+                    el.innerHTML = `<span class="material-symbols-outlined text-gray-700 text-[24px]">${app.icon}</span>`;
+                    container.appendChild(el);
+                });
+            },
+
+            renderStartMenu: () => {
+                // Pinned
+                const pinnedContainer = document.getElementById('pinned-apps-grid');
+                pinnedContainer.innerHTML = '';
+                State.apps.filter(a => a.pinned).forEach(app => {
+                    const el = document.createElement('button');
+                    el.className = 'flex flex-col items-center gap-1 p-2 hover:bg-gray-100 rounded-lg transition-colors';
+                    el.onclick = () => {
+                        WindowManager.open(app.id);
+                        UI.toggleStartMenu();
+                    };
+                    el.innerHTML = `
+                        <span class="material-symbols-outlined text-blue-600 text-[24px] bg-blue-50 p-2 rounded-full">${app.icon}</span>
+                        <span class="text-[10px] text-gray-600 font-medium truncate w-full text-center">${app.name}</span>
+                    `;
+                    pinnedContainer.appendChild(el);
+                });
+
+                // All Apps
+                const listContainer = document.getElementById('all-apps-list');
+                listContainer.innerHTML = '';
+                // Sort alpha
+                const sorted = [...State.apps].sort((a,b) => a.name.localeCompare(b.name));
+                sorted.forEach(app => {
+                    const el = document.createElement('button');
+                    el.className = 'w-full flex items-center gap-3 p-2 hover:bg-gray-100 rounded-lg transition-colors text-left';
+                    el.onclick = () => {
+                        WindowManager.open(app.id);
+                        UI.toggleStartMenu();
+                    };
+                    el.innerHTML = `
+                        <span class="material-symbols-outlined text-gray-500 text-[18px]">${app.icon}</span>
+                        <span class="text-sm text-gray-700">${app.name}</span>
+                    `;
+                    listContainer.appendChild(el);
+                });
+                
+                // Search Logic
+                const searchInput = document.getElementById('app-search');
+                searchInput.onkeyup = (e) => {
+                    const term = e.target.value.toLowerCase();
+                    const items = listContainer.getElementsByTagName('button');
+                    Array.from(items).forEach(btn => {
+                        const txt = btn.innerText.toLowerCase();
+                        btn.style.display = txt.includes(term) ? 'flex' : 'none';
+                    });
+                };
+            },
+
+            renderNotifications: () => {
+                const list = document.getElementById('notification-list');
+                const noMsg = document.getElementById('no-notifs-msg');
+                
+                // Keep the no message div, clear rest
+                Array.from(list.children).forEach(c => {
+                    if(c.id !== 'no-notifs-msg') c.remove();
+                });
+
+                if(State.notifications.length === 0) {
+                    noMsg.style.display = 'flex';
+                } else {
+                    noMsg.style.display = 'none';
+                    State.notifications.forEach(notif => {
+                        const el = document.createElement('div');
+                        el.className = 'mb-2 bg-white/60 p-3 rounded-lg border border-gray-100 shadow-sm relative group hover:bg-white transition-colors';
+                        el.innerHTML = `
+                            <div class="flex justify-between items-start mb-1">
+                                <div class="flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[14px] text-blue-500">${notif.icon}</span>
+                                    <span class="text-xs font-bold text-gray-700">${notif.appName}</span>
+                                </div>
+                                <span class="text-[10px] text-gray-400">${notif.time}</span>
+                            </div>
+                            <p class="text-xs text-gray-600 leading-snug">${notif.message}</p>
+                            <button onclick="UI.removeNotification(${notif.id})" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 hover:text-red-500">
+                                <span class="material-symbols-outlined text-[14px]">close</span>
+                            </button>
+                        `;
+                        list.appendChild(el);
+                    });
+                }
+            },
+            
+            removeNotification: (id) => {
+                State.notifications = State.notifications.filter(n => n.id !== id);
+                UI.renderNotifications();
+            },
+
+            updateClock: () => {
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+                const dateStr = now.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: 'numeric' });
+                
+                document.getElementById('taskbar-clock').innerText = timeStr;
+                document.getElementById('taskbar-date').innerText = dateStr;
+
+                // Panel
+                document.getElementById('panel-clock').innerText = timeStr;
+                document.getElementById('panel-date').innerText = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+            },
+
+            toggleStartMenu: () => {
+                const menu = document.getElementById('start-menu');
+                const notif = document.getElementById('notification-panel');
+                if(!notif.classList.contains('hidden')) notif.classList.add('hidden');
+                menu.classList.toggle('hidden');
+            },
+
+            toggleNotificationPanel: () => {
+                const menu = document.getElementById('start-menu');
+                const notif = document.getElementById('notification-panel');
+                if(!menu.classList.contains('hidden')) menu.classList.add('hidden');
+                notif.classList.toggle('hidden');
+                UI.renderNotifications();
+            }
+        };
+
+        // --- Settings App Logic ---
+        const Settings = {
+            switchTab: (tabName) => {
+                // Update Sidebar
+                document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+                    btn.classList.remove('bg-blue-100', 'text-blue-700', 'active');
+                    btn.classList.add('text-gray-700');
+                    if(btn.innerText.toLowerCase().includes(tabName) || (tabName === 'install' && btn.innerText.includes('Install'))) {
+                         btn.classList.add('bg-blue-100', 'text-blue-700', 'active');
+                         btn.classList.remove('text-gray-700');
+                    }
+                });
+
+                // Update Content
+                document.querySelectorAll('.settings-content').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            },
+
+            renderLists: () => {
+                // Startup List
+                const sList = document.getElementById('startup-list');
+                sList.innerHTML = '';
+                State.apps.filter(a => !a.system).forEach(app => {
+                    const isChecked = State.settings.autoStart.includes(app.id);
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center justify-between p-2 bg-white border border-gray-200 rounded';
+                    div.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-gray-500">${app.icon}</span>
+                            <span class="text-sm font-medium">${app.name}</span>
+                        </div>
+                        <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="Settings.toggleAutoStart('${app.id}', this.checked)">
+                    `;
+                    sList.appendChild(div);
+                });
+
+                // Block Notifications List
+                const bList = document.getElementById('block-notif-list');
+                bList.innerHTML = '';
+                State.apps.filter(a => !a.system).forEach(app => {
+                    const isBlocked = State.settings.blockedNotifications.includes(app.id);
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center justify-between p-2 bg-white border border-gray-200 rounded';
+                    div.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-gray-500">${app.icon}</span>
+                            <span class="text-sm font-medium">${app.name}</span>
+                        </div>
+                        <label class="flex items-center gap-2 text-xs text-gray-500">
+                            Block
+                            <input type="checkbox" ${isBlocked ? 'checked' : ''} onchange="Settings.toggleBlockNotif('${app.id}', this.checked)">
+                        </label>
+                    `;
+                    bList.appendChild(div);
+                });
+            },
+
+            toggleAutoStart: (id, val) => {
+                if(val) {
+                    if(!State.settings.autoStart.includes(id)) State.settings.autoStart.push(id);
+                } else {
+                    State.settings.autoStart = State.settings.autoStart.filter(x => x !== id);
+                }
+                OS.saveSettings();
+            },
+
+            toggleBlockNotif: (id, val) => {
+                if(val) {
+                    if(!State.settings.blockedNotifications.includes(id)) State.settings.blockedNotifications.push(id);
+                } else {
+                    State.settings.blockedNotifications = State.settings.blockedNotifications.filter(x => x !== id);
+                }
+                OS.saveSettings();
+            },
+
+            setWallpaper: (url) => {
+                OS.applyWallpaper(url);
+            },
+
+            installApp: () => {
+                const name = document.getElementById('install-name').value;
+                const icon = document.getElementById('install-icon').value || 'extension';
+                const url = document.getElementById('install-url').value;
+
+                if(!name || !url) {
+                    alert('Name and URL are required');
+                    return;
+                }
+
+                const newApp = {
+                    id: 'app_' + Date.now(),
+                    name: name,
+                    icon: icon,
+                    url: url,
+                    pinned: false
+                };
+
+                State.apps.push(newApp);
+                OS.saveApps();
+                
+                // Refresh UI
+                UI.renderDesktopIcons();
+                UI.renderStartMenu();
+                
+                // Send Notification
+                // We mock an internal notification here since Settings is the app doing it
+                const settingsApp = State.apps.find(a => a.id === 'settings');
+                Notifications.add(settingsApp, `App "${name}" installed successfully.`);
+
+                // Reset Form
+                document.getElementById('install-name').value = '';
+                document.getElementById('install-icon').value = '';
+                document.getElementById('install-url').value = '';
+                
+                Settings.switchTab('apps'); // Go to apps to see it (optional)
+            }
+        };
+
+        // --- Draggable Settings Modal Logic ---
+        const settingsWin = document.getElementById('settings-window');
+        const settingsHeader = settingsWin.querySelector('.draggable-header');
+        let isDraggingSettings = false;
+        let settingsOffset = { x: 0, y: 0 };
+
+        settingsHeader.addEventListener('mousedown', (e) => {
+            isDraggingSettings = true;
+            const rect = settingsWin.getBoundingClientRect();
+            settingsOffset.x = e.clientX - rect.left;
+            settingsOffset.y = e.clientY - rect.top;
+            
+            // Bring to front logic could go here
+            
+            const onMove = (ev) => {
+                if(!isDraggingSettings) return;
+                settingsWin.style.left = (ev.clientX - settingsOffset.x) + (rect.width/2) + 'px'; // Adjust for translate center
+                settingsWin.style.top = (ev.clientY - settingsOffset.y) + (rect.height/2) + 'px';
+                // Note: The CSS translate(-50%, -50%) makes absolute positioning tricky, simplified here
+                // Better approach: Remove transform when dragging starts. 
+            };
+            const onUp = () => {
+                isDraggingSettings = false;
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        });
+
+        // Click outside to close menus
+        document.addEventListener('click', (e) => {
+            const startMenu = document.getElementById('start-menu');
+            const notifPanel = document.getElementById('notification-panel');
+            const startBtn = document.querySelector('button[onclick="UI.toggleStartMenu()"]');
+            const clockBtn = document.querySelector('button[onclick="UI.toggleNotificationPanel()"]');
+
+            if (!startMenu.contains(e.target) && !startBtn.contains(e.target) && !startMenu.classList.contains('hidden')) {
+                startMenu.classList.add('hidden');
+            }
+            if (!notifPanel.contains(e.target) && !clockBtn.contains(e.target) && !notifPanel.classList.contains('hidden')) {
+                notifPanel.classList.add('hidden');
+            }
+        });
+
+        // Initialize OS
+        window.onload = OS.init;
+
+    </script>
+</body>
+</html>
+
