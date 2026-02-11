@@ -899,6 +899,423 @@
         window.onload = OS.init;
 
     </script>
+<style>
+    /* Context Menu Styles */
+    #os-context-menu {
+        position: fixed;
+        z-index: 10000;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(0,0,0,0.1);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        border-radius: 8px;
+        padding: 4px;
+        min-width: 160px;
+        display: none;
+        animation: ctx-fade 0.1s ease-out;
+        font-family: 'Inter', sans-serif;
+    }
+    @keyframes ctx-fade { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    
+    .ctx-item {
+        padding: 6px 10px;
+        font-size: 13px;
+        color: #333;
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background 0.1s;
+    }
+    .ctx-item:hover { background-color: #3b82f6; color: white; }
+    .ctx-item .material-symbols-outlined { font-size: 16px; }
+    .ctx-hr { height: 1px; background: #e5e7eb; margin: 4px 0; }
+
+    /* Override Desktop Grid for Free Dragging */
+    #desktop-icons {
+        display: block !important; /* Override 'grid' */
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    .desktop-icon-abs {
+        position: absolute;
+        width: 80px;
+        height: 80px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border-radius: 6px;
+        cursor: default;
+        transition: background 0.1s;
+    }
+    .desktop-icon-abs:hover { background: rgba(255,255,255,0.2); }
+    .desktop-icon-abs.dragging { 
+        z-index: 50; 
+        opacity: 0.8; 
+        pointer-events: none; /* Let mouse events pass through to drop zones */
+    }
+</style>
+
+<div id="os-context-menu"></div>
+
+<script>
+    // --- 1. Enhanced State Management ---
+    // We add a desktop layout map to localStorage to remember icon positions
+    const DesktopState = {
+        layout: JSON.parse(localStorage.getItem('atlas_desktop_layout')) || [],
+        gridSize: { w: 90, h: 100 },
+        clipboard: null
+    };
+
+    // Helper: Find free spot or default positions if empty
+    const initDesktopLayout = () => {
+        // If layout is empty, map existing apps to a default grid
+        if (DesktopState.layout.length === 0) {
+            State.apps.forEach((app, index) => {
+                if (app.system) return; // Skip settings/system apps from desktop by default if desired
+                const col = Math.floor(index / 6);
+                const row = index % 6;
+                DesktopState.layout.push({
+                    appId: app.id,
+                    x: 20 + (col * DesktopState.gridSize.w),
+                    y: 20 + (row * DesktopState.gridSize.h)
+                });
+            });
+            saveDesktopLayout();
+        }
+    };
+
+    const saveDesktopLayout = () => {
+        localStorage.setItem('atlas_desktop_layout', JSON.stringify(DesktopState.layout));
+    };
+
+    // --- 2. Context Menu System ---
+    const ContextMenu = {
+        menuEl: document.getElementById('os-context-menu'),
+        
+        show: (e, items) => {
+            e.preventDefault();
+            ContextMenu.menuEl.innerHTML = '';
+            
+            items.forEach(item => {
+                if(item.separator) {
+                    const hr = document.createElement('div');
+                    hr.className = 'ctx-hr';
+                    ContextMenu.menuEl.appendChild(hr);
+                } else {
+                    const el = document.createElement('div');
+                    el.className = 'ctx-item';
+                    el.innerHTML = `<span class="material-symbols-outlined">${item.icon || ''}</span> <span>${item.label}</span>`;
+                    el.onclick = () => {
+                        item.action();
+                        ContextMenu.hide();
+                    };
+                    ContextMenu.menuEl.appendChild(el);
+                }
+            });
+
+            // Positioning logic to keep within screen bounds
+            let x = e.clientX;
+            let y = e.clientY;
+            
+            ContextMenu.menuEl.style.display = 'block';
+            const rect = ContextMenu.menuEl.getBoundingClientRect();
+            
+            if (x + rect.width > window.innerWidth) x -= rect.width;
+            if (y + rect.height > window.innerHeight) y -= rect.height;
+
+            ContextMenu.menuEl.style.left = x + 'px';
+            ContextMenu.menuEl.style.top = y + 'px';
+        },
+
+        hide: () => {
+            ContextMenu.menuEl.style.display = 'none';
+        }
+    };
+
+    // Hide context menu on any left click
+    document.addEventListener('click', (e) => {
+        if (!ContextMenu.menuEl.contains(e.target)) ContextMenu.hide();
+    });
+
+    // --- 3. Override & Extend UI Functions ---
+
+    // Override Desktop Renderer for Absolute Positioning
+    UI.renderDesktopIcons = () => {
+        const container = document.getElementById('desktop-icons');
+        container.innerHTML = ''; // Clear grid classes logic from previous code
+
+        DesktopState.layout.forEach(item => {
+            const app = State.apps.find(a => a.id === item.appId);
+            if (!app) return; // App might have been uninstalled
+
+            const el = document.createElement('div');
+            el.className = 'desktop-icon-abs';
+            el.style.left = item.x + 'px';
+            el.style.top = item.y + 'px';
+            el.title = app.name;
+            
+            // Icon Content
+            el.innerHTML = `
+                <div class="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-md text-blue-500 mb-1 pointer-events-none">
+                    <span class="material-symbols-outlined text-[24px]">${app.icon}</span>
+                </div>
+                <span class="text-[11px] text-white font-medium shadow-black drop-shadow-md text-center leading-tight line-clamp-2 pointer-events-none select-none">${app.name}</span>
+            `;
+
+            // Left Click: Open
+            el.onclick = () => WindowManager.open(app.id);
+
+            // Drag Start
+            el.onmousedown = (e) => {
+                if(e.button === 2) return; // Ignore right click
+                startDesktopDrag(e, el, item);
+            };
+
+            // Right Click Context Menu
+            el.oncontextmenu = (e) => {
+                e.stopPropagation(); // Stop bubbling to wallpaper
+                const menuItems = [
+                    { label: 'Open', icon: 'open_in_new', action: () => WindowManager.open(app.id) },
+                    { separator: true },
+                    { 
+                        label: app.pinned ? 'Unpin from Start' : 'Pin to Start', 
+                        icon: app.pinned ? 'keep_off' : 'keep', 
+                        action: () => togglePin(app.id) 
+                    },
+                    { 
+                        label: 'Unpin from Desktop', 
+                        icon: 'delete', 
+                        action: () => {
+                            DesktopState.layout = DesktopState.layout.filter(i => i.appId !== app.id);
+                            saveDesktopLayout();
+                            UI.renderDesktopIcons();
+                        }
+                    }
+                ];
+                ContextMenu.show(e, menuItems);
+            };
+
+            container.appendChild(el);
+        });
+    };
+
+    // Override Start Menu to add Context Menu & Draggable
+    const originalRenderStart = UI.renderStartMenu;
+    UI.renderStartMenu = () => {
+        // Run original to generate HTML structure, then attach events
+        originalRenderStart(); 
+        
+        // Enhance Pinned Apps
+        const pinnedContainer = document.getElementById('pinned-apps-grid');
+        Array.from(pinnedContainer.children).forEach((btn, index) => {
+            // Re-find app based on index/order (fragile but works for this structure) or re-bind
+            const pinnedApps = State.apps.filter(a => a.pinned);
+            const app = pinnedApps[index];
+            if(app) {
+                btn.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    ContextMenu.show(e, [
+                        { label: 'Unpin from Start', icon: 'keep_off', action: () => togglePin(app.id) },
+                        { label: 'Create Shortcut', icon: 'add_to_queue', action: () => addToDesktop(app.id) }
+                    ]);
+                };
+                // Make Draggable
+                btn.draggable = true;
+                btn.ondragstart = (e) => {
+                    e.dataTransfer.setData('text/plain', app.id);
+                    e.dataTransfer.effectAllowed = "copy";
+                    UI.toggleStartMenu(); // Close menu on drag
+                };
+            }
+        });
+
+        // Enhance All Apps List
+        const listContainer = document.getElementById('all-apps-list');
+        // We need to re-sort to match the original function's logic to find the right app
+        const sortedApps = [...State.apps].sort((a,b) => a.name.localeCompare(b.name));
+        
+        Array.from(listContainer.children).forEach((btn, index) => {
+            const app = sortedApps[index];
+            if(app) {
+                btn.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    ContextMenu.show(e, [
+                        { label: app.pinned ? 'Unpin from Start' : 'Pin to Start', icon: app.pinned ? 'keep_off' : 'keep', action: () => togglePin(app.id) },
+                        { separator: true },
+                        { label: 'Configure', icon: 'settings', action: () => { 
+                            WindowManager.open('settings'); 
+                            Settings.switchTab('apps'); 
+                        }},
+                        { label: 'Create Shortcut', icon: 'add_to_queue', action: () => addToDesktop(app.id) }
+                    ]);
+                };
+                // Make Draggable
+                btn.draggable = true;
+                btn.ondragstart = (e) => {
+                    e.dataTransfer.setData('text/plain', app.id);
+                    e.dataTransfer.effectAllowed = "copy";
+                    UI.toggleStartMenu();
+                };
+            }
+        });
+    };
+
+    // --- 4. Logic Implementation ---
+
+    function togglePin(appId) {
+        const app = State.apps.find(a => a.id === appId);
+        if(app) {
+            app.pinned = !app.pinned;
+            OS.saveApps();
+            UI.renderStartMenu();
+        }
+    }
+
+    function addToDesktop(appId, x = null, y = null) {
+        // Check if already exists? Allow duplicates like shortcuts? Let's avoid overlapping duplicates.
+        const existing = DesktopState.layout.find(i => i.appId === appId && Math.abs(i.x - x) < 10 && Math.abs(i.y - y) < 10);
+        if(existing) return;
+
+        if (x === null || y === null) {
+            // Find first free spot
+            let found = false;
+            for(let r=0; r<10; r++) {
+                for(let c=0; c<10; c++) {
+                    const testX = 20 + (c * DesktopState.gridSize.w);
+                    const testY = 20 + (r * DesktopState.gridSize.h);
+                    if (!DesktopState.layout.find(i => i.x === testX && i.y === testY)) {
+                        x = testX; y = testY;
+                        found = true;
+                        break;
+                    }
+                }
+                if(found) break;
+            }
+        }
+
+        DesktopState.layout.push({ appId, x, y });
+        saveDesktopLayout();
+        UI.renderDesktopIcons();
+    }
+
+    // --- 5. Global Event Handling ---
+
+    // Global Right Click Handler (Wallpaper)
+    document.addEventListener('contextmenu', (e) => {
+        // If we clicked on desktop wallpaper (id=desktop)
+        if (e.target.id === 'desktop' || e.target.id === 'desktop-icons') {
+            e.preventDefault();
+            ContextMenu.show(e, [
+                { label: 'Refresh', icon: 'refresh', action: () => {
+                    UI.renderDesktopIcons();
+                    UI.renderStartMenu();
+                    UI.renderTaskbar();
+                }},
+                { separator: true },
+                { label: 'Change Wallpaper', icon: 'wallpaper', action: () => {
+                    WindowManager.open('settings');
+                    Settings.switchTab('personalization');
+                }}
+            ]);
+        }
+        // Browser default context menu is blocked by preventing default if not handled above
+        // The body tag already has oncontextmenu="return false", so we are good.
+    });
+
+    // Desktop Icon Dragging Logic
+    let isDraggingIcon = false;
+    
+    function startDesktopDrag(e, element, layoutItem) {
+        isDraggingIcon = true;
+        element.classList.add('dragging');
+        
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startLeft = parseInt(element.style.left || 0);
+        const startTop = parseInt(element.style.top || 0);
+
+        const onMove = (ev) => {
+            const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+            element.style.left = (startLeft + dx) + 'px';
+            element.style.top = (startTop + dy) + 'px';
+        };
+
+        const onUp = (ev) => {
+            isDraggingIcon = false;
+            element.classList.remove('dragging');
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+
+            // Snap to Grid
+            const finalX = parseInt(element.style.left || 0);
+            const finalY = parseInt(element.style.top || 0);
+            
+            const snappedX = Math.round(finalX / DesktopState.gridSize.w) * DesktopState.gridSize.w + 20; // +20 padding
+            const snappedY = Math.round(finalY / DesktopState.gridSize.h) * DesktopState.gridSize.h + 20;
+
+            // Update State
+            layoutItem.x = snappedX > 0 ? snappedX : 20;
+            layoutItem.y = snappedY > 0 ? snappedY : 20;
+            
+            saveDesktopLayout();
+            UI.renderDesktopIcons(); // Re-render to snap visually
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    }
+
+    // Handle Drop from Start Menu to Desktop
+    const desktopEl = document.getElementById('desktop');
+    
+    // Override existing drag events on desktop
+    desktopEl.ondragover = (e) => {
+        e.preventDefault(); // Allow drop
+    };
+    
+    desktopEl.ondrop = (e) => {
+        e.preventDefault();
+        const appId = e.dataTransfer.getData('text/plain');
+        if (appId) {
+            // Calculate grid position relative to desktop
+            const rect = desktopEl.getBoundingClientRect();
+            const relX = e.clientX - rect.left;
+            const relY = e.clientY - rect.top;
+
+            const snapX = Math.round(relX / DesktopState.gridSize.w) * DesktopState.gridSize.w + 20;
+            const snapY = Math.round(relY / DesktopState.gridSize.h) * DesktopState.gridSize.h + 20;
+
+            addToDesktop(appId, snapX, snapY);
+        }
+    };
+
+    // --- 6. Initialization Hook ---
+    // We hook into the window load, or run immediately if the page is already parsed
+    // Since this is at the bottom, we can just run initialization updates now.
+    
+    // Initialize Layout Data
+    initDesktopLayout();
+
+    // Force re-render of UI components to apply new event listeners
+    setTimeout(() => {
+        UI.renderDesktopIcons();
+        UI.renderStartMenu();
+    }, 100);
+
+</script>
+
+
+
+
 </body>
 </html>
 
