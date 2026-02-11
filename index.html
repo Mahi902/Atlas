@@ -305,13 +305,22 @@
                 }
 
                 // Check if already open
-                const existing = State.windows.find(w => w.appId === appId);
-                if (existing) {
-                    if (hidden) return;
-                    WindowManager.focus(existing.id);
-                    if(existing.state === 'min') WindowManager.restore(existing.id);
-                    return;
-                }
+const existing = State.windows.find(w => w.appId === appId);
+if (existing) {
+    if (hidden) return;
+
+    // Fix: If the app is in the background (auto-started), make it visible
+    if (existing.state === 'background') {
+        const winEl = document.getElementById(existing.id);
+        winEl.style.visibility = 'visible';
+        winEl.style.pointerEvents = 'auto';
+        existing.state = 'normal';
+    }
+
+    WindowManager.focus(existing.id);
+    if(existing.state === 'min') WindowManager.restore(existing.id);
+    return;
+}
 
                 const winId = 'win_' + Date.now();
                 const zIndex = ++State.zIndexCounter;
