@@ -1324,6 +1324,499 @@ if (existing) {
 </script>
 
 
+<!-- STATUS PANEL ADDON - Paste this before </body> tag -->
+
+<!-- Network/Battery Status Panel HTML -->
+<div id="status-panel" class="hidden absolute bottom-14 right-24 w-72 glass-dark rounded-xl shadow-2xl flex flex-col z-50 animate-slide-up p-4">
+    <div class="space-y-4">
+        <!-- Network Status -->
+        <div class="flex items-center gap-3">
+            <span id="status-wifi-icon" class="material-symbols-outlined text-blue-600 text-[24px]">wifi</span>
+            <div class="flex-1">
+                <div class="text-sm font-medium" id="status-network-text">Connected</div>
+                <div class="text-xs text-gray-500">Network</div>
+            </div>
+        </div>
+
+        <!-- Battery Status -->
+        <div class="flex items-center gap-3">
+            <span id="status-battery-icon" class="material-symbols-outlined text-green-600 text-[24px]">battery_full</span>
+            <div class="flex-1">
+                <div class="text-sm font-medium" id="status-battery-text">100%</div>
+                <div class="text-xs text-gray-500" id="status-battery-status">Not Charging</div>
+            </div>
+        </div>
+
+        <!-- Brightness Control -->
+        <div class="pt-2 border-t border-gray-200">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="material-symbols-outlined text-gray-600 text-[20px]">light_mode</span>
+                <span class="text-sm font-medium">Brightness</span>
+                <span class="text-xs text-gray-500 ml-auto" id="brightness-value">100%</span>
+            </div>
+            <input type="range" id="brightness-slider" min="10" max="100" value="100" 
+                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                oninput="StatusPanelAddon.setBrightness(this.value)">
+        </div>
+    </div>
+</div>
+
+<!-- Brightness Overlay -->
+<div id="brightness-overlay" class="absolute inset-0 z-[150] bg-black pointer-events-none" style="opacity: 0;"></div>
+
+<style>
+    /* Additional CSS for Status Panel */
+    #brightness-overlay {
+        transition: opacity 0.2s ease;
+    }
+</style>
+
+<script>
+// STATUS PANEL ADDON SCRIPT
+(function() {
+    'use strict';
+    
+    // Create global StatusPanelAddon object
+    window.StatusPanelAddon = {
+        state: {
+            isOnline: navigator.onLine,
+            batteryLevel: 100,
+            isCharging: false,
+            brightness: 100,
+            panelOpen: false
+        },
+
+        init() {
+            console.log('Status Panel Addon Initialized');
+            
+            // Add status button to taskbar
+            this.addStatusButton();
+            
+            // Initialize battery API
+            this.initBattery();
+            
+            // Monitor network status
+            window.addEventListener('online', () => {
+                this.state.isOnline = true;
+                this.updateNetworkStatus();
+            });
+            
+            window.addEventListener('offline', () => {
+                this.state.isOnline = false;
+                this.updateNetworkStatus();
+            });
+            
+            // Update initial status
+            this.updateNetworkStatus();
+            this.updateBatteryDisplay();
+            
+            // Close panel when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#status-panel') && 
+                    !e.target.closest('#status-button')) {
+                    this.closePanel();
+                }
+            });
+        },
+
+        addStatusButton() {
+            // Find the system tray in taskbar
+            const systemTray = document.querySelector('#taskbar .flex.items-center.h-full.gap-2:last-child');
+            
+            if (systemTray) {
+                // Create status button
+                const statusButton = document.createElement('button');
+                statusButton.id = 'status-button';
+                statusButton.className = 'h-10 px-2 hover:bg-white/50 rounded flex items-center gap-2 transition-colors';
+                statusButton.innerHTML = '<span id="taskbar-wifi-icon" class="material-symbols-outlined text-blue-600 text-[20px]">wifi</span>';
+                statusButton.onclick = () => this.togglePanel();
+                
+                // Insert before the notification/time button
+                const timeButton = systemTray.querySelector('button[onclick*="toggleNotificationPanel"]');
+                if (timeButton) {
+                    systemTray.insertBefore(statusButton, timeButton);
+                } else {
+                    systemTray.appendChild(statusButton);
+                }
+            }
+        },
+
+        togglePanel() {
+            const panel = document.getElementById('status-panel');
+            
+            if (panel.classList.contains('hidden')) {
+                // Close other panels if they exist
+                if (window.UI && typeof window.UI.closeAllPanels === 'function') {
+                    window.UI.closeAllPanels();
+                } else {
+                    // Manual close
+                    const startMenu = document.getElementById('start-menu');
+                    const notifPanel = document.getElementById('notification-panel');
+                    if (startMenu) startMenu.classList.add('hidden');
+                    if (notifPanel) notifPanel.classList.add('hidden');
+                }
+                
+                panel.classList.remove('hidden');
+                this.state.panelOpen = true;
+            } else {
+                this.closePanel();
+            }
+        },
+
+        closePanel() {
+            const panel = document.getElementById('status-panel');
+            if (panel) {
+                panel.classList.add('hidden');
+                this.state.panelOpen = false;
+            }
+        },
+
+        async initBattery() {
+            if ('getBattery' in navigator) {
+                try {
+                    const battery = await navigator.getBattery();
+                    
+                    const updateBattery = () => {
+                        this.state.batteryLevel = Math.round(battery.level * 100);
+                        this.state.isCharging = battery.charging;
+                        this.updateBatteryDisplay();
+                    };
+                    
+                    updateBattery();
+                    battery.addEventListener('levelchange', updateBattery);
+                    battery.addEventListener('chargingchange', updateBattery);
+                } catch (e) {
+                    console.log('Battery API not available');
+                }
+            }
+        },
+
+        updateBatteryDisplay() {
+            const batteryText = document.getElementById('status-battery-text');
+            const batteryStatus = document.getElementById('status-battery-status');
+            const batteryIcon = document.getElementById('status-battery-icon');
+            
+            if (batteryText) batteryText.textContent = this.state.batteryLevel + '%';
+            if (batteryStatus) batteryStatus.textContent = this.state.isCharging ? 'Charging' : 'Not Charging';
+            
+            if (batteryIcon) {
+                if (this.state.isCharging) {
+                    batteryIcon.textContent = 'battery_charging_full';
+                    batteryIcon.className = 'material-symbols-outlined text-green-600 text-[24px]';
+                } else if (this.state.batteryLevel > 80) {
+                    batteryIcon.textContent = 'battery_full';
+                    batteryIcon.className = 'material-symbols-outlined text-green-600 text-[24px]';
+                } else if (this.state.batteryLevel > 50) {
+                    batteryIcon.textContent = 'battery_5_bar';
+                    batteryIcon.className = 'material-symbols-outlined text-blue-600 text-[24px]';
+                } else if (this.state.batteryLevel > 20) {
+                    batteryIcon.textContent = 'battery_3_bar';
+                    batteryIcon.className = 'material-symbols-outlined text-yellow-600 text-[24px]';
+                } else {
+                    batteryIcon.textContent = 'battery_1_bar';
+                    batteryIcon.className = 'material-symbols-outlined text-red-600 text-[24px]';
+                }
+            }
+        },
+
+        updateNetworkStatus() {
+            const networkText = document.getElementById('status-network-text');
+            const wifiIcon = document.getElementById('status-wifi-icon');
+            const taskbarWifiIcon = document.getElementById('taskbar-wifi-icon');
+            
+            if (this.state.isOnline) {
+                if (networkText) networkText.textContent = 'Connected';
+                if (wifiIcon) {
+                    wifiIcon.textContent = 'wifi';
+                    wifiIcon.className = 'material-symbols-outlined text-blue-600 text-[24px]';
+                }
+                if (taskbarWifiIcon) {
+                    taskbarWifiIcon.textContent = 'wifi';
+                    taskbarWifiIcon.className = 'material-symbols-outlined text-blue-600 text-[20px]';
+                }
+            } else {
+                if (networkText) networkText.textContent = 'Offline';
+                if (wifiIcon) {
+                    wifiIcon.textContent = 'wifi_off';
+                    wifiIcon.className = 'material-symbols-outlined text-red-600 text-[24px]';
+                }
+                if (taskbarWifiIcon) {
+                    taskbarWifiIcon.textContent = 'wifi_off';
+                    taskbarWifiIcon.className = 'material-symbols-outlined text-red-600 text-[20px]';
+                }
+            }
+        },
+
+        setBrightness(value) {
+            this.state.brightness = parseInt(value);
+            const overlay = document.getElementById('brightness-overlay');
+            const brightnessValue = document.getElementById('brightness-value');
+            
+            // Convert brightness to darkness (100% = 0 opacity, 10% = 0.9 opacity)
+            const darkness = 1 - (this.state.brightness / 100);
+            if (overlay) overlay.style.opacity = darkness;
+            
+            if (brightnessValue) brightnessValue.textContent = this.state.brightness + '%';
+        }
+    };
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            StatusPanelAddon.init();
+        });
+    } else {
+        // DOM already loaded
+        StatusPanelAddon.init();
+    }
+})();
+</script>
+
+<!-- TASKBAR APP CONTEXT MENU - Paste this before </body> tag -->
+
+<script>
+(function() {
+    'use strict';
+    
+    console.log('Taskbar App Context Menu: Initializing...');
+    
+    // Create or use existing ContextMenu
+    if (!window.ContextMenu) {
+        window.ContextMenu = {
+            currentMenu: null,
+
+            show(event, items) {
+                this.hide();
+                
+                const menu = document.createElement('div');
+                menu.className = 'absolute glass-dark rounded-lg shadow-2xl py-2 min-w-[180px] z-[200]';
+                menu.style.left = event.clientX + 'px';
+                menu.style.top = event.clientY + 'px';
+                
+                items.forEach(item => {
+                    if (item.separator) {
+                        const sep = document.createElement('div');
+                        sep.className = 'h-px bg-gray-200 my-1';
+                        menu.appendChild(sep);
+                    } else {
+                        const menuItem = document.createElement('button');
+                        menuItem.className = 'w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-3 transition-colors';
+                        menuItem.innerHTML = `
+                            ${item.icon ? `<span class="material-symbols-outlined text-[18px] text-gray-600">${item.icon}</span>` : ''}
+                            <span>${item.label}</span>
+                        `;
+                        menuItem.onclick = () => {
+                            item.action();
+                            this.hide();
+                        };
+                        menu.appendChild(menuItem);
+                    }
+                });
+                
+                document.body.appendChild(menu);
+                this.currentMenu = menu;
+                
+                // Close on click outside
+                setTimeout(() => {
+                    document.addEventListener('click', () => this.hide(), { once: true });
+                }, 10);
+            },
+
+            hide() {
+                if (this.currentMenu) {
+                    this.currentMenu.remove();
+                    this.currentMenu = null;
+                }
+            }
+        };
+    }
+    
+    // Override UI.renderTaskbar to add context menu to taskbar items
+    if (window.UI && window.UI.renderTaskbar) {
+        const originalRenderTaskbar = window.UI.renderTaskbar;
+        
+        window.UI.renderTaskbar = function() {
+            // Call original function
+            originalRenderTaskbar.call(this);
+            
+            // Now add context menus to all taskbar items
+            const taskbarApps = document.getElementById('taskbar-apps');
+            if (!taskbarApps) return;
+            
+            const taskbarItems = taskbarApps.querySelectorAll('.taskbar-item');
+            
+            taskbarItems.forEach(item => {
+                // Get the app ID from the onclick attribute
+                const onclickAttr = item.getAttribute('onclick');
+                if (!onclickAttr) return;
+                
+                // Extract app ID from onclick="WindowManager.toggleMinimize('app-id')"
+                const match = onclickAttr.match(/toggleMinimize\('([^']+)'\)/);
+                if (!match) return;
+                
+                const appId = match[1];
+                const app = window.State?.apps?.find(a => a.id === appId);
+                const windowData = window.State?.runningApps?.find(w => w.id === appId);
+                
+                if (!app) return;
+                
+                // Long press timer for mobile/desktop
+                let longPressTimer;
+                
+                // Right-click context menu
+                item.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const menuItems = [];
+                    
+                    // Restore option if minimized
+                    if (windowData && windowData.minimized) {
+                        menuItems.push({
+                            label: 'Restore',
+                            icon: 'open_in_full',
+                            action: () => {
+                                if (window.WindowManager && window.WindowManager.toggleMinimize) {
+                                    window.WindowManager.toggleMinimize(appId);
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Maximize/Restore option
+                    if (windowData) {
+                        if (windowData.maximized) {
+                            menuItems.push({
+                                label: 'Restore Down',
+                                icon: 'close_fullscreen',
+                                action: () => {
+                                    if (window.WindowManager && window.WindowManager.toggleMaximize) {
+                                        window.WindowManager.toggleMaximize(appId);
+                                    }
+                                }
+                            });
+                        } else {
+                            menuItems.push({
+                                label: 'Maximize',
+                                icon: 'crop_square',
+                                action: () => {
+                                    if (window.WindowManager && window.WindowManager.toggleMaximize) {
+                                        window.WindowManager.toggleMaximize(appId);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    
+                    // Separator
+                    if (menuItems.length > 0) {
+                        menuItems.push({ separator: true });
+                    }
+                    
+                    // Close option
+                    menuItems.push({
+                        label: 'Close',
+                        icon: 'close',
+                        action: () => {
+                            if (window.WindowManager && window.WindowManager.close) {
+                                window.WindowManager.close(appId);
+                            }
+                        }
+                    });
+                    
+                    window.ContextMenu.show(e, menuItems);
+                });
+                
+                // Long-press for touch devices
+                item.addEventListener('mousedown', (e) => {
+                    if (e.button === 0) { // Left click only
+                        longPressTimer = setTimeout(() => {
+                            // Trigger context menu at current position
+                            const rect = item.getBoundingClientRect();
+                            const fakeEvent = {
+                                clientX: rect.left + rect.width / 2,
+                                clientY: rect.top + rect.height / 2,
+                                preventDefault: () => {},
+                                stopPropagation: () => {}
+                            };
+                            
+                            item.dispatchEvent(new MouseEvent('contextmenu', {
+                                bubbles: true,
+                                cancelable: true,
+                                clientX: fakeEvent.clientX,
+                                clientY: fakeEvent.clientY
+                            }));
+                        }, 500); // 500ms long press
+                    }
+                });
+                
+                item.addEventListener('mouseup', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                item.addEventListener('mouseleave', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                // Touch events
+                item.addEventListener('touchstart', (e) => {
+                    longPressTimer = setTimeout(() => {
+                        const touch = e.touches[0];
+                        const fakeEvent = {
+                            clientX: touch.clientX,
+                            clientY: touch.clientY,
+                            preventDefault: () => {},
+                            stopPropagation: () => {}
+                        };
+                        
+                        item.dispatchEvent(new MouseEvent('contextmenu', {
+                            bubbles: true,
+                            cancelable: true,
+                            clientX: fakeEvent.clientX,
+                            clientY: fakeEvent.clientY
+                        }));
+                    }, 500);
+                });
+                
+                item.addEventListener('touchend', () => {
+                    clearTimeout(longPressTimer);
+                });
+                
+                item.addEventListener('touchcancel', () => {
+                    clearTimeout(longPressTimer);
+                });
+            });
+        };
+        
+        // Re-render taskbar to apply changes
+        if (window.State?.runningApps?.length > 0) {
+            window.UI.renderTaskbar();
+        }
+    }
+    
+    // Monitor for new apps being opened
+    if (window.WindowManager && window.WindowManager.open) {
+        const originalOpen = window.WindowManager.open;
+        
+        window.WindowManager.open = function(appId) {
+            const result = originalOpen.call(this, appId);
+            
+            // Re-render taskbar with context menus after a brief delay
+            setTimeout(() => {
+                if (window.UI && window.UI.renderTaskbar) {
+                    window.UI.renderTaskbar();
+                }
+            }, 100);
+            
+            return result;
+        };
+    }
+    
+    console.log('Taskbar App Context Menu: Active');
+    console.log('Right-click or long-press taskbar apps for Maximize/Close options');
+})();
+</script>
+
 
 
 </body>
